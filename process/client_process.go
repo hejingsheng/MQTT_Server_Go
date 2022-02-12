@@ -1,5 +1,10 @@
 package process
 
+/*
+#include "../protocol_stack/test.h"
+#include "../protocol_stack/test.c"
+*/
+import "C"
 import (
 	"fmt"
 	"net"
@@ -17,6 +22,8 @@ func init() {
 }
 
 func ClientProcess(localconn net.Conn) {
+	ret := C.add(1,2)
+	fmt.Println("ret=",ret)
 	fmt.Println("start a tcp client")
 
 	globalClientsMapLock.Lock()
