@@ -1,4 +1,4 @@
-package main
+package process
 
 import (
 	"fmt"
@@ -9,10 +9,19 @@ import (
 var (
 	gloablClientsMap map[net.Conn]int
 	globalClientsMapLock sync.Mutex
+	index int = 1
 )
 
-func tcpClientProcess(localconn net.Conn) {
+func init() {
+	gloablClientsMap = make(map[net.Conn]int, 1)
+}
+
+func ClientProcess(localconn net.Conn) {
 	fmt.Println("start a tcp client")
+
+	globalClientsMapLock.Lock()
+	gloablClientsMap[localconn] = index
+	globalClientsMapLock.Unlock()
 
 	defer func() {
 		fmt.Println("one client close exit process")
@@ -43,33 +52,5 @@ func tcpClientProcess(localconn net.Conn) {
 				conn.Write(write_buf);
 			}
 		}
-	}
-}
-
-func main() {
-	fmt.Println("MQTT Server Running...")
-	var index int = 1
-	gloablClientsMap = make(map[net.Conn]int, 1)
-	listen, err := net.Listen("tcp", "0.0.0.0:1883");
-	if err != nil {
-		fmt.Println("listen error");
-		return;
-	}
-	defer listen.Close()
-
-	for {
-		fmt.Println("wait a client connect")
-		conn, err := listen.Accept()
-		if err != nil {
-			fmt.Println("client connect error")
-		} else {
-			fmt.Printf("a client connect success %v\n", conn.RemoteAddr().String())
-			globalClientsMapLock.Lock()
-			gloablClientsMap[conn] = index
-			globalClientsMapLock.Unlock()
-			index++;
-			go tcpClientProcess(conn)
-		}
-
 	}
 }
