@@ -1,33 +1,45 @@
 package process
 
-/*
-#include "../protocol_stack/test.h"
-#include "../protocol_stack/test.c"
-*/
-import "C"
 import (
 	"fmt"
+	"github.com/mqtt_server/MQTT_Server_Go/protocol_stack"
 	"net"
 	"sync"
 )
 
+type MqttClientInfo struct {
+	clientId string
+	username string
+	password string
+	pingperiod int
+	clearSession int
+}
+
 var (
-	gloablClientsMap map[net.Conn]int
+	gloablClientsMap map[net.Conn]MqttClientInfo
 	globalClientsMapLock sync.Mutex
 	index int = 1
 )
 
 func init() {
-	gloablClientsMap = make(map[net.Conn]int, 1)
+	gloablClientsMap = make(map[net.Conn]MqttClientInfo, 1)
 }
 
 func ClientProcess(localconn net.Conn) {
-	ret := C.add(1,2)
-	fmt.Println("ret=",ret)
+	//ret := C.add(1,2)
+	//fmt.Println("ret=",ret)
 	fmt.Println("start a tcp client")
 
+	mqttClientData := MqttClientInfo{
+		clientId:"",
+		username:"",
+		password:"",
+		pingperiod:0,
+		clearSession:0,
+	}
+
 	globalClientsMapLock.Lock()
-	gloablClientsMap[localconn] = index
+	gloablClientsMap[localconn] = mqttClientData
 	globalClientsMapLock.Unlock()
 
 	defer func() {
@@ -46,12 +58,13 @@ func ClientProcess(localconn net.Conn) {
 			break
 		} else {
 			fmt.Printf("read %d data %s\n", num, read_buf)
+			var conndata protocol_stack.MQTTPacketConnectData
+			conndata.MQTTDeserialize_connect(read_buf, num)
 			var write_buf []byte = make([]byte, num)
 			for i := 0; i < num; i++ {
 				write_buf[i] = read_buf[i];
 			}
 			for conn, index := range gloablClientsMap {
-				//fmt.Println(country, "首都是", countryCapitalMap [country])
 				if conn == localconn{
 					continue
 				}
