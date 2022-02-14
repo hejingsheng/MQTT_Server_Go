@@ -114,7 +114,12 @@ func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len 
 	leftdata = data[index:len]
 	index += mqttPacket_readString(leftdata, &connData.clientID)
 	if connectFlag & 0x04 != 0 {
-
+		connData.wills.qos = int(connectFlag & 0x18 >> 3)
+		connData.wills.retained = byte(connectFlag & 0x20 >> 5)
+		leftdata = data[index:len]
+		index += mqttPacket_readString(leftdata, &connData.wills.topic)
+		leftdata = data[index:len]
+		index += mqttPacket_readString(leftdata, &connData.wills.message)
 	}
 	if connectFlag & 0x80 != 0 {
 		leftdata = data[index:len]
