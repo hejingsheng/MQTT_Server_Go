@@ -1,5 +1,9 @@
 package protocol_stack
 
+import (
+	"fmt"
+)
+
 const (
 	CONNECT = 1
 	CONNACK
@@ -17,17 +21,24 @@ const (
 	DISCONNECT
 )
 
+type MQTTPacketWillOptions struct {
+	topic string
+	message string
+	retained byte
+	qos int
+}
+
 type MQTTPacketConnectData struct {
 	version int
     clientID string
 	keepAliveInterval int
     cleansession int
+	wills MQTTPacketWillOptions
     username string
 	password string
 }
 
 func mqttPacket_decode(data []byte, value *int) int {
-
 	var c byte
 	var multiplier int = 1
 	var len int = 0
@@ -46,23 +57,70 @@ func mqttPacket_decode(data []byte, value *int) int {
 		}
 		i++
 	}
-
 	return len
 }
 
-func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len int) int {
+func mqttPacket_readString(data []byte, str *string) int {
+	var len int = 0
+	len = (int)(data[0] << 8 | data[1])
+	var tmp []byte = make([]byte, 0)
+	for i := 0; i < len; i++  {
+		tmp = append(tmp, data[i+2])
+	}
+	*str = string(tmp)
+	return len+2
+}
 
+func mqttPacket_readProtocol(data []byte, version *int) int {
+	var len int
+	len = (int)(data[0] << 8 | data[1])
+	var tmp []byte = make([]byte, 0)
+	for i := 0; i < len; i++  {
+		tmp = append(tmp, data[i+2])
+	}
+	str := string(tmp)
+	fmt.Println("read str=",str)
+	*version = int(data[2+len])
+	return 2+len+1
+}
+
+func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len int) int {
 	var value int
-	firstByte := data[0]
-	mqttDataType := firstByte & 0xF0
+	var version int
+	var connectFlag byte
+
+	index := 0
+	firstByte := data[index]
+	index++
+	mqttDataType := (firstByte & 0xF0) >> 4
 
 	if mqttDataType != CONNECT {
-		//return -1
+		return -1
 	}
 
-	leftdata := data[1:len]
-	mqttPacket_decode(leftdata, &value)
+	leftdata := data[index:len]
+	index += mqttPacket_decode(leftdata, &value) // read remaining length
+	fmt.Println("index=",index," value=",value)
+	//read protocol name
+	leftdata = data[index:len]
+	index += mqttPacket_readProtocol(leftdata, &version)
+	fmt.Println("index=",index," version=",version)
+	connData.version = version
+	connectFlag = data[index]
+	index++
+	connData.cleansession = int(connectFlag & 0x02 >> 1)
+	connData.keepAliveInterval = int(data[index] << 8 | data[index+1])
+	index += 2
+	leftdata = data[index:len]
+	index += mqttPacket_readString(leftdata, &connData.clientID)
+	if connectFlag & 0x04 != 0 {
 
-
+	}
+	if connectFlag & 0x80 != 0 {
+		leftdata = data[index:len]
+		index += mqttPacket_readString(leftdata, &connData.username)
+		leftdata = data[index:len]
+		index += mqttPacket_readString(leftdata, &connData.password)
+	}
 	return 0
 }
