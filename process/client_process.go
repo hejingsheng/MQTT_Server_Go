@@ -60,10 +60,9 @@ func ClientProcess(localconn net.Conn) {
 			fmt.Printf("read %d data %s\n", num, read_buf)
 			var conndata protocol_stack.MQTTPacketConnectData
 			conndata.MQTTDeserialize_connect(read_buf, num)
-			var write_buf []byte = make([]byte, num)
-			for i := 0; i < num; i++ {
-				write_buf[i] = read_buf[i];
-			}
+			var write_buf []byte = make([]byte, 0)
+			num = conndata.MQTTSeserialize_connack(&write_buf)
+			fmt.Printf("write %d data\n", num)
 			for conn, index := range gloablClientsMap {
 				if conn == localconn{
 					continue

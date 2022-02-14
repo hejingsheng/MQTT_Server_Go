@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	CONNECT = 1
+	NONE = iota
+	CONNECT
 	CONNACK
 	PUBLISH
 	PUBACK
@@ -58,6 +59,25 @@ func mqttPacket_decode(data []byte, value *int) int {
 		i++
 	}
 	return len
+}
+
+func mqttPacket_encode(length int) (int, [4]byte) {
+	var buf [4]byte
+	var index int = 0
+	for {
+		var tmp byte
+		tmp = byte(length % 128)
+		length /= 128
+		if length > 0 {
+			tmp |= 0x80
+		}
+		buf[index] = tmp;
+		index++
+		if length <= 0 {
+			break
+		}
+	}
+	return index, buf
 }
 
 func mqttPacket_readString(data []byte, str *string) int {
@@ -128,4 +148,25 @@ func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len 
 		index += mqttPacket_readString(leftdata, &connData.password)
 	}
 	return 0
+}
+
+func (connData *MQTTPacketConnectData) MQTTSeserialize_connack(data *[]byte) int {
+	var header byte
+	index := 0
+	header = CONNACK
+	header <<= 4
+	*data = append(*data, header)
+	index++
+	tmp, leftLen := mqttPacket_encode(2);
+	for i := 0; i < tmp; i++ {
+		*data = append(*data, leftLen[i])
+	}
+	index += tmp
+	*data = append(*data, 0x01)
+	index++
+	if connData.username == connData.password {
+		*data = append(*data, 0x00)
+		index++
+	}
+	return index
 }
