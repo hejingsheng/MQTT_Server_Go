@@ -7,6 +7,8 @@ import (
 	"sync"
 )
 
+
+
 type MqttClientInfo struct {
 	clientId string
 	username string
@@ -14,16 +16,18 @@ type MqttClientInfo struct {
 	pingperiod uint16
 	clearSession uint8
 	loginSuccess byte
+
+	subInfo []protocol_stack.MqttSubInfo
 }
 
 var (
-	gloablClientsMap map[net.Conn]MqttClientInfo
+	gloablClientsMap map[net.Conn]*MqttClientInfo
 	globalClientsMapLock sync.Mutex
 	index int = 1
 )
 
 func init() {
-	gloablClientsMap = make(map[net.Conn]MqttClientInfo, 1)
+	gloablClientsMap = make(map[net.Conn]*MqttClientInfo, 1)
 }
 
 func ClientProcess(localconn net.Conn) {
@@ -40,7 +44,7 @@ func ClientProcess(localconn net.Conn) {
 	}
 
 	globalClientsMapLock.Lock()
-	gloablClientsMap[localconn] = mqttClientData
+	gloablClientsMap[localconn] = &mqttClientData
 	globalClientsMapLock.Unlock()
 
 	defer func() {
@@ -87,9 +91,31 @@ func ClientProcess(localconn net.Conn) {
 					} else {
 						var subscribeData protocol_stack.MQTTPacketSubscribeData
 						topicNum := subscribeData.MQTTDeserialize_subscribe(read_buf, num)
+						log.LogPrint(log.LOG_INFO, "client subscribe %d topic", topicNum)
 						var write_buf []byte = make([]byte, 0)
+						subscribeData.MQTTGetSubInfo(&mqttClientData.subInfo, topicNum)
 						subscribeData.MQTTSeserialize_suback(&write_buf, topicNum)
 						localconn.Write(write_buf);
+					}
+				case protocol_stack.PUBLISH:
+					if mqttClientData.loginSuccess != 1 {
+						log.LogPrint(log.LOG_ERROR, "client not login")
+					} else {
+						var publishData protocol_stack.MQTTPacketPublishData
+						var pubInfo protocol_stack.MQTTPubInfo
+						ret := publishData.MQTTDeserialize_publish(read_buf, num)
+						publishData.MQTTGetPublishInfo(&pubInfo)
+						log.LogPrint(log.LOG_INFO, "client public msg %d, public %s,payload %s", ret, pubInfo.Topic, pubInfo.Payload)
+						for conn, client := range gloablClientsMap {
+							if conn == localconn{
+								continue
+							}
+							for _, data := range client.subInfo {
+								if data.Topic == pubInfo.Topic {
+									conn.Write(read_buf)
+								}
+							}
+						}
 					}
 				case protocol_stack.PINGREQ:
 					var pingpongdata protocol_stack.MQTTPacketPingPongData
@@ -100,13 +126,7 @@ func ClientProcess(localconn net.Conn) {
 				}
 			}
 
-			for conn, _ := range gloablClientsMap {
-				if conn == localconn{
-					continue
-				}
-				//fmt.Println("this is ", index, " conn")
-				//conn.Write(write_buf);
-			}
+
 		}
 	}
 }

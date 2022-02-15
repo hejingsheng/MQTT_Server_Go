@@ -1,5 +1,10 @@
 package protocol_stack
 
+type MqttSubInfo struct {
+	Topic string
+	Qos uint8
+}
+
 type MQTTPacketSubscribeData struct {
 	dup uint8
 	packetId uint16
@@ -63,4 +68,14 @@ func (subdata *MQTTPacketSubscribeData) MQTTSeserialize_suback(buf *[]byte, num 
 		index++
 	}
 	return index
+}
+
+func (subdata *MQTTPacketSubscribeData) MQTTGetSubInfo(subInfo *[]MqttSubInfo, topicNum int) {
+	for i := 0; i < topicNum; i++ {
+		subItem := MqttSubInfo{
+			Topic:subdata.topic[i],
+			Qos:subdata.qos[i],
+		}
+		*subInfo = append(*subInfo, subItem)
+	}
 }
