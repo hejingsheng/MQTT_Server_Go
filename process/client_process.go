@@ -97,6 +97,18 @@ func ClientProcess(localconn net.Conn) {
 						subscribeData.MQTTSeserialize_suback(&write_buf, topicNum)
 						localconn.Write(write_buf);
 					}
+				case protocol_stack.UNSUBSCRIBE:
+					if mqttClientData.loginSuccess != 1 {
+						log.LogPrint(log.LOG_ERROR, "client not login")
+					} else {
+						var unSubscribeData protocol_stack.MQTTPacketUnSubscribeData
+						topicNum := unSubscribeData.MQTTDeserialize_unsubscribe(read_buf, num)
+						log.LogPrint(log.LOG_INFO, "client unsubscribe %d topic", topicNum)
+						var write_buf []byte = make([]byte, 0)
+						//unSubscribeData.MQTTGetSubInfo(&mqttClientData.subInfo, topicNum)
+						unSubscribeData.MQTTSeserialize_unsuback(&write_buf)
+						localconn.Write(write_buf);
+					}
 				case protocol_stack.PUBLISH:
 					if mqttClientData.loginSuccess != 1 {
 						log.LogPrint(log.LOG_ERROR, "client not login")
