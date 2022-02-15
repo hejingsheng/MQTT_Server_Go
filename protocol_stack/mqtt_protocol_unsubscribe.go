@@ -56,3 +56,12 @@ func (unsubData *MQTTPacketUnSubscribeData)MQTTSeserialize_unsuback(buf *[]byte)
 	index += 2
 	return index
 }
+
+func (unsubData *MQTTPacketUnSubscribeData)MQTTRemoveUnSubTopic(subInfo map[string]uint8) {
+	for _, topic := range unsubData.topic {
+		_ ,ok := subInfo[topic]
+		if ok {
+			delete(subInfo, topic)
+		}
+	}
+}

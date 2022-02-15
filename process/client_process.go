@@ -7,8 +7,6 @@ import (
 	"sync"
 )
 
-
-
 type MqttClientInfo struct {
 	clientId string
 	username string
@@ -17,7 +15,8 @@ type MqttClientInfo struct {
 	clearSession uint8
 	loginSuccess byte
 
-	subInfo []protocol_stack.MqttSubInfo
+	//subInfo []protocol_stack.MqttSubInfo
+	subInfo map[string]uint8   // subscribe topic  key = topic  value = qos
 }
 
 var (
@@ -77,6 +76,7 @@ func ClientProcess(localconn net.Conn) {
 						if ret == 0 {
 							mqttClientData.loginSuccess = 1
 							mqttClientData.pingperiod, mqttClientData.clearSession = conndata.MQTT_GetConnectInfo(&mqttClientData.username, &mqttClientData.password, &mqttClientData.clientId)
+							mqttClientData.subInfo = make(map[string]uint8)
 						}
 						localconn.Write(write_buf);
 					} else {
@@ -93,7 +93,7 @@ func ClientProcess(localconn net.Conn) {
 						topicNum := subscribeData.MQTTDeserialize_subscribe(read_buf, num)
 						log.LogPrint(log.LOG_INFO, "client subscribe %d topic", topicNum)
 						var write_buf []byte = make([]byte, 0)
-						subscribeData.MQTTGetSubInfo(&mqttClientData.subInfo, topicNum)
+						subscribeData.MQTTGetSubInfo(mqttClientData.subInfo, topicNum)
 						subscribeData.MQTTSeserialize_suback(&write_buf, topicNum)
 						localconn.Write(write_buf);
 					}
@@ -105,7 +105,7 @@ func ClientProcess(localconn net.Conn) {
 						topicNum := unSubscribeData.MQTTDeserialize_unsubscribe(read_buf, num)
 						log.LogPrint(log.LOG_INFO, "client unsubscribe %d topic", topicNum)
 						var write_buf []byte = make([]byte, 0)
-						//unSubscribeData.MQTTGetSubInfo(&mqttClientData.subInfo, topicNum)
+						unSubscribeData.MQTTRemoveUnSubTopic(mqttClientData.subInfo)
 						unSubscribeData.MQTTSeserialize_unsuback(&write_buf)
 						localconn.Write(write_buf);
 					}
@@ -118,17 +118,23 @@ func ClientProcess(localconn net.Conn) {
 						ret := publishData.MQTTDeserialize_publish(read_buf, num)
 						publishData.MQTTGetPublishInfo(&pubInfo)
 						log.LogPrint(log.LOG_INFO, "client public msg %d, public %s,payload %s", ret, pubInfo.Topic, pubInfo.Payload)
+						var write_buf []byte = read_buf[:num]
 						for conn, client := range gloablClientsMap {
 							if conn == localconn{
 								continue
 							}
-							for _, data := range client.subInfo {
-								if data.Topic == pubInfo.Topic {
-									conn.Write(read_buf)
+							for topic := range client.subInfo {
+								if topic == pubInfo.Topic {
+									conn.Write(write_buf)
 								}
 							}
 						}
 					}
+				case protocol_stack.PUBACK:
+				case protocol_stack.PUBREC:
+				case protocol_stack.PUBREL:
+				case protocol_stack.PUBCOMP:
+
 				case protocol_stack.PINGREQ:
 					var pingpongdata protocol_stack.MQTTPacketPingPongData
 					pingpongdata.MQTTDeserialize_ping(read_buf, num)

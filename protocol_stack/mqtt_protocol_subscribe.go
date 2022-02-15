@@ -70,12 +70,8 @@ func (subdata *MQTTPacketSubscribeData) MQTTSeserialize_suback(buf *[]byte, num 
 	return index
 }
 
-func (subdata *MQTTPacketSubscribeData) MQTTGetSubInfo(subInfo *[]MqttSubInfo, topicNum int) {
+func (subdata *MQTTPacketSubscribeData) MQTTGetSubInfo(subInfo map[string]uint8, topicNum int) {
 	for i := 0; i < topicNum; i++ {
-		subItem := MqttSubInfo{
-			Topic:subdata.topic[i],
-			Qos:subdata.qos[i],
-		}
-		*subInfo = append(*subInfo, subItem)
+		subInfo[subdata.topic[i]] = subdata.qos[i]
 	}
 }
