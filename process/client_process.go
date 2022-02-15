@@ -11,8 +11,8 @@ type MqttClientInfo struct {
 	clientId string
 	username string
 	password string
-	pingperiod int
-	clearSession int
+	pingperiod uint16
+	clearSession uint8
 	loginSuccess byte
 }
 
@@ -81,6 +81,16 @@ func ClientProcess(localconn net.Conn) {
 				case protocol_stack.DISCONNECT:
 					log.LogPrint(log.LOG_INFO, "client send disconnect req")
 					localconn.Close()
+				case protocol_stack.SUBSCRIBE:
+					if mqttClientData.loginSuccess != 1 {
+						log.LogPrint(log.LOG_ERROR, "client not login")
+					} else {
+						var subscribeData protocol_stack.MQTTPacketSubscribeData
+						topicNum := subscribeData.MQTTDeserialize_subscribe(read_buf, num)
+						var write_buf []byte = make([]byte, 0)
+						subscribeData.MQTTSeserialize_suback(&write_buf, topicNum)
+						localconn.Write(write_buf);
+					}
 				case protocol_stack.PINGREQ:
 					var pingpongdata protocol_stack.MQTTPacketPingPongData
 					pingpongdata.MQTTDeserialize_ping(read_buf, num)

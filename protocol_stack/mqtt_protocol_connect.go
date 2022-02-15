@@ -22,14 +22,14 @@ type MQTTPacketWillOptions struct {
 	topic string
 	message string
 	retained byte
-	qos int
+	qos uint8
 }
 
 type MQTTPacketConnectData struct {
 	version int
     clientID string
-	keepAliveInterval int
-    cleansession int
+	keepAliveInterval uint16
+    cleansession uint8
 	wills MQTTPacketWillOptions
     username string
 	password string
@@ -56,13 +56,13 @@ func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len 
 	connData.version = version
 	connectFlag = data[index]
 	index++
-	connData.cleansession = int(connectFlag & 0x02 >> 1)
-	connData.keepAliveInterval = int(data[index] << 8 | data[index+1])
+	connData.cleansession = uint8(connectFlag & 0x02 >> 1)
+	connData.keepAliveInterval = uint16(data[index]) << 8 | uint16(data[index+1])
 	index += 2
 	leftdata = data[index:len]
 	index += mqttPacket_readString(leftdata, &connData.clientID)
 	if connectFlag & 0x04 != 0 {
-		connData.wills.qos = int(connectFlag & 0x18 >> 3)
+		connData.wills.qos = uint8(connectFlag & 0x18 >> 3)
 		connData.wills.retained = byte(connectFlag & 0x20 >> 5)
 		leftdata = data[index:len]
 		index += mqttPacket_readString(leftdata, &connData.wills.topic)
@@ -103,7 +103,7 @@ func (connData *MQTTPacketConnectData) MQTTSeserialize_connack(data *[]byte) (in
 	return index, retCode
 }
 
-func (connData *MQTTPacketConnectData) MQTT_GetConnectInfo(name *string, pass *string, clientId *string) (int, int) {
+func (connData *MQTTPacketConnectData) MQTT_GetConnectInfo(name *string, pass *string, clientId *string) (uint16, uint8) {
 	*name = connData.username
 	*pass = connData.password
 	*clientId = connData.clientID
