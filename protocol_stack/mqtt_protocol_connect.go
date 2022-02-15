@@ -1,9 +1,5 @@
 package protocol_stack
 
-import (
-	"fmt"
-)
-
 const (
 	NONE = iota
 	CONNECT
@@ -55,10 +51,8 @@ func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len 
 
 	leftdata := data[index:len]
 	index += mqttPacket_decode(leftdata, &value) // read remaining length
-	fmt.Println("index=",index," value=",value)
 	leftdata = data[index:len]
 	index += mqttPacket_readProtocol(leftdata, &version) //read protocol name
-	fmt.Println("index=",index," version=",version)
 	connData.version = version
 	connectFlag = data[index]
 	index++

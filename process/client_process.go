@@ -1,7 +1,7 @@
 package process
 
 import (
-	"fmt"
+	"github.com/mqtt_server/MQTT_Server_Go/log"
 	"github.com/mqtt_server/MQTT_Server_Go/protocol_stack"
 	"net"
 	"sync"
@@ -27,9 +27,8 @@ func init() {
 }
 
 func ClientProcess(localconn net.Conn) {
-	//ret := C.add(1,2)
-	//fmt.Println("ret=",ret)
-	fmt.Println("start a tcp client")
+
+	log.LogPrint(log.LOG_INFO, "start a tcp client")
 
 	mqttClientData := MqttClientInfo{
 		clientId:"",
@@ -45,7 +44,7 @@ func ClientProcess(localconn net.Conn) {
 	globalClientsMapLock.Unlock()
 
 	defer func() {
-		fmt.Println("one client close exit process")
+		log.LogPrint(log.LOG_INFO, "one client close exit process")
 		globalClientsMapLock.Lock()
 		delete(gloablClientsMap, localconn)
 		globalClientsMapLock.Unlock()
@@ -56,10 +55,10 @@ func ClientProcess(localconn net.Conn) {
 		var read_buf []byte = make([]byte, 1024)
 		num, err := localconn.Read(read_buf)
 		if err != nil {
-			fmt.Println("read error")
+			log.LogPrint(log.LOG_ERROR, "read error")
 			break
 		} else {
-			fmt.Printf("read %d data %s\n", num, read_buf)
+			log.LogPrint(log.LOG_DEBUG, "read %d data %v", num, read_buf)
 			mqttMsgType, _ := protocol_stack.MqttPacket_ParseFixHeader(read_buf)
 
 			if mqttMsgType != -1 {
@@ -70,17 +69,17 @@ func ClientProcess(localconn net.Conn) {
 						conndata.MQTTDeserialize_connect(read_buf, num)
 						var write_buf []byte = make([]byte, 0)
 						num, ret := conndata.MQTTSeserialize_connack(&write_buf)
-						fmt.Printf("write %d data, ret=%d\n", num, ret)
+						log.LogPrint(log.LOG_DEBUG, "write %d data, ret %d", num, ret)
 						if ret == 0 {
 							mqttClientData.loginSuccess = 1
 							mqttClientData.pingperiod, mqttClientData.clearSession = conndata.MQTT_GetConnectInfo(&mqttClientData.username, &mqttClientData.password, &mqttClientData.clientId)
 						}
 						localconn.Write(write_buf);
 					} else {
-						fmt.Println("this client have login")
+						log.LogPrint(log.LOG_WARNING, "this client have login")
 					}
 				case protocol_stack.DISCONNECT:
-					fmt.Println("client send disconnect req")
+					log.LogPrint(log.LOG_INFO, "client send disconnect req")
 					localconn.Close()
 				case protocol_stack.PINGREQ:
 					var pingpongdata protocol_stack.MQTTPacketPingPongData
@@ -91,11 +90,11 @@ func ClientProcess(localconn net.Conn) {
 				}
 			}
 
-			for conn, index := range gloablClientsMap {
+			for conn, _ := range gloablClientsMap {
 				if conn == localconn{
 					continue
 				}
-				fmt.Println("this is ", index, " conn")
+				//fmt.Println("this is ", index, " conn")
 				//conn.Write(write_buf);
 			}
 		}
