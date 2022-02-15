@@ -39,71 +39,6 @@ type MQTTPacketConnectData struct {
 	password string
 }
 
-func mqttPacket_decode(data []byte, value *int) int {
-	var c byte
-	var multiplier int = 1
-	var len int = 0
-	i := 0
-
-	for {
-		len++
-		if len > 4 {
-			return 0
-		}
-		c = data[i]
-		*value += int(c & 127) * multiplier
-		multiplier *= 128
-		if data[i] & 128 == 0 {
-			break;
-		}
-		i++
-	}
-	return len
-}
-
-func mqttPacket_encode(length int) (int, [4]byte) {
-	var buf [4]byte
-	var index int = 0
-	for {
-		var tmp byte
-		tmp = byte(length % 128)
-		length /= 128
-		if length > 0 {
-			tmp |= 0x80
-		}
-		buf[index] = tmp;
-		index++
-		if length <= 0 {
-			break
-		}
-	}
-	return index, buf
-}
-
-func mqttPacket_readString(data []byte, str *string) int {
-	var len int = 0
-	len = (int)(data[0] << 8 | data[1])
-	var tmp []byte = make([]byte, 0)
-	for i := 0; i < len; i++  {
-		tmp = append(tmp, data[i+2])
-	}
-	*str = string(tmp)
-	return len+2
-}
-
-func mqttPacket_readProtocol(data []byte, version *int) int {
-	var len int
-	len = (int)(data[0] << 8 | data[1])
-	var tmp []byte = make([]byte, 0)
-	for i := 0; i < len; i++  {
-		tmp = append(tmp, data[i+2])
-	}
-	str := string(tmp)
-	fmt.Println("read str=",str)
-	*version = int(data[2+len])
-	return 2+len+1
-}
-
 func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len int) int {
 	var value int
 	var version int
@@ -121,9 +56,8 @@ func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len 
 	leftdata := data[index:len]
 	index += mqttPacket_decode(leftdata, &value) // read remaining length
 	fmt.Println("index=",index," value=",value)
-	//read protocol name
 	leftdata = data[index:len]
-	index += mqttPacket_readProtocol(leftdata, &version)
+	index += mqttPacket_readProtocol(leftdata, &version) //read protocol name
 	fmt.Println("index=",index," version=",version)
 	connData.version = version
 	connectFlag = data[index]
@@ -150,8 +84,9 @@ func (connData *MQTTPacketConnectData) MQTTDeserialize_connect(data []byte, len 
 	return 0
 }
 
-func (connData *MQTTPacketConnectData) MQTTSeserialize_connack(data *[]byte) int {
+func (connData *MQTTPacketConnectData) MQTTSeserialize_connack(data *[]byte) (int, byte) {
 	var header byte
+	var retCode byte
 	index := 0
 	header = CONNACK
 	header <<= 4
@@ -165,8 +100,18 @@ func (connData *MQTTPacketConnectData) MQTTSeserialize_connack(data *[]byte) int
 	*data = append(*data, 0x01)
 	index++
 	if connData.username == connData.password {
-		*data = append(*data, 0x00)
-		index++
+		retCode = 0x00
+	} else {
+		retCode = 0x04
 	}
-	return index
+	*data = append(*data, retCode)
+	index++
+	return index, retCode
+}
+
+func (connData *MQTTPacketConnectData) MQTT_GetConnectInfo(name *string, pass *string, clientId *string) (int, int) {
+	*name = connData.username
+	*pass = connData.password
+	*clientId = connData.clientID
+	return connData.keepAliveInterval, connData.cleansession
 }
