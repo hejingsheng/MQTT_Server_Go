@@ -8,22 +8,22 @@ import (
 )
 
 type MqttClientInfo struct {
-	clientId string
-	username string
-	password string
-	pingperiod uint16
+	clientId     string
+	username     string
+	password     string
+	pingperiod   uint16
 	clearSession uint8
 	loginSuccess byte
 
 	//subInfo []protocol_stack.MqttSubInfo
-	subInfo map[string]uint8   // subscribe topic  key = topic  value = qos
-	pubStatus map[uint16]uint8  // publish msg status key = packetId value = status for qos1 and qos2 status is puback pubrec pubrel pubcomp
+	subInfo   map[string]uint8 // subscribe topic  key = topic  value = qos
+	pubStatus map[uint16]uint8 // publish msg status key = packetId value = status for qos1 and qos2 status is puback pubrec pubrel pubcomp
 }
 
 var (
-	gloablClientsMap map[net.Conn]*MqttClientInfo
+	gloablClientsMap     map[net.Conn]*MqttClientInfo
 	globalClientsMapLock sync.Mutex
-	index int = 1
+	index                int = 1
 )
 
 func init() {
@@ -35,12 +35,12 @@ func ClientProcess(localconn net.Conn) {
 	log.LogPrint(log.LOG_INFO, "start a tcp client")
 
 	mqttClientData := MqttClientInfo{
-		clientId:"",
-		username:"",
-		password:"",
-		pingperiod:0,
-		clearSession:0,
-		loginSuccess:0,
+		clientId:     "",
+		username:     "",
+		password:     "",
+		pingperiod:   0,
+		clearSession: 0,
+		loginSuccess: 0,
 	}
 
 	globalClientsMapLock.Lock()
@@ -53,7 +53,7 @@ func ClientProcess(localconn net.Conn) {
 		delete(gloablClientsMap, localconn)
 		globalClientsMapLock.Unlock()
 		localconn.Close()
-	}();
+	}()
 
 	for {
 		var read_buf []byte = make([]byte, 1024)
@@ -62,7 +62,7 @@ func ClientProcess(localconn net.Conn) {
 			log.LogPrint(log.LOG_ERROR, "read error")
 			break
 		} else {
-			log.LogPrint(log.LOG_DEBUG, "read %d data %v", num, read_buf)
+			log.LogPrint(log.LOG_DEBUG, "client [%s] read %d data %v", mqttClientData.clientId, num, read_buf)
 			mqttMsgType, _ := protocol_stack.MqttPacket_ParseFixHeader(read_buf)
 
 			if mqttMsgType != -1 {
@@ -80,7 +80,7 @@ func ClientProcess(localconn net.Conn) {
 							mqttClientData.subInfo = make(map[string]uint8)
 							mqttClientData.pubStatus = make(map[uint16]uint8)
 						}
-						localconn.Write(write_buf);
+						localconn.Write(write_buf)
 					} else {
 						log.LogPrint(log.LOG_WARNING, "this client have login")
 					}
@@ -93,11 +93,11 @@ func ClientProcess(localconn net.Conn) {
 					} else {
 						var subscribeData protocol_stack.MQTTPacketSubscribeData
 						topicNum := subscribeData.MQTTDeserialize_subscribe(read_buf, num)
-						log.LogPrint(log.LOG_INFO, "client subscribe %d topic", topicNum)
+						log.LogPrint(log.LOG_INFO, "client [%s] subscribe %d topic", mqttClientData.clientId, topicNum)
 						var write_buf []byte = make([]byte, 0)
 						subscribeData.MQTTGetSubInfo(mqttClientData.subInfo, topicNum)
 						subscribeData.MQTTSeserialize_suback(&write_buf, topicNum)
-						localconn.Write(write_buf);
+						localconn.Write(write_buf)
 					}
 				case protocol_stack.UNSUBSCRIBE:
 					if mqttClientData.loginSuccess != 1 {
@@ -105,11 +105,11 @@ func ClientProcess(localconn net.Conn) {
 					} else {
 						var unSubscribeData protocol_stack.MQTTPacketUnSubscribeData
 						topicNum := unSubscribeData.MQTTDeserialize_unsubscribe(read_buf, num)
-						log.LogPrint(log.LOG_INFO, "client unsubscribe %d topic", topicNum)
+						log.LogPrint(log.LOG_INFO, "client [%s] unsubscribe %d topic", mqttClientData.clientId, topicNum)
 						var write_buf []byte = make([]byte, 0)
 						unSubscribeData.MQTTRemoveUnSubTopic(mqttClientData.subInfo)
 						unSubscribeData.MQTTSeserialize_unsuback(&write_buf)
-						localconn.Write(write_buf);
+						localconn.Write(write_buf)
 					}
 				case protocol_stack.PUBLISH:
 					if mqttClientData.loginSuccess != 1 {
@@ -119,7 +119,7 @@ func ClientProcess(localconn net.Conn) {
 						var pubInfo protocol_stack.MQTTPubInfo
 						ret := publishData.MQTTDeserialize_publish(read_buf, num)
 						publishData.MQTTGetPublishInfo(&pubInfo)
-						log.LogPrint(log.LOG_INFO, "client public msg %d, public %s,payload %d", ret, pubInfo.Topic, pubInfo.Qos)
+						log.LogPrint(log.LOG_INFO, "client [%s] public msg %d, public %s,payload %d", mqttClientData.clientId, ret, pubInfo.Topic, pubInfo.Qos)
 						var write_buf []byte = read_buf[:num]
 						for conn, client := range gloablClientsMap {
 							//if conn == localconn{
@@ -131,7 +131,7 @@ func ClientProcess(localconn net.Conn) {
 									if pubInfo.Qos == 1 {
 										mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBACK
 									} else if pubInfo.Qos == 2 {
-										//mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBREC
+										mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBREC
 									} else if pubInfo.Qos == 0 {
 
 									} else {
@@ -160,9 +160,63 @@ func ClientProcess(localconn net.Conn) {
 						}
 					}
 				case protocol_stack.PUBREC:
+					var publishData protocol_stack.MQTTPacketPublishData
+					var pubInfo protocol_stack.MQTTPubInfo
+					publishData.MQTTDeserialize_pubrec(read_buf, num)
+					publishData.MQTTGetPublishInfo(&pubInfo)
+					var write_buf []byte = read_buf[:num]
+					for conn, client := range gloablClientsMap {
+						//if conn == localconn{
+						//	continue
+						//}
+						status, ok := client.pubStatus[pubInfo.PacketId]
+						if ok && status == protocol_stack.PUBREC {
+							mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBREL
+							conn.Write(write_buf)
+						} else {
+							log.LogPrint(log.LOG_WARNING, "not find client or client status error, drop it")
+						}
+					}
 				case protocol_stack.PUBREL:
+					var publishData protocol_stack.MQTTPacketPublishData
+					var pubInfo protocol_stack.MQTTPubInfo
+					publishData.MQTTDeserialize_pubrel(read_buf, num)
+					publishData.MQTTGetPublishInfo(&pubInfo)
+					var write_buf []byte = read_buf[:num]
+					for conn, client := range gloablClientsMap {
+						//if conn == localconn{
+						//	continue
+						//}
+						status, ok := client.pubStatus[pubInfo.PacketId]
+						if ok && status == protocol_stack.PUBREL {
+							mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBCOMP
+							conn.Write(write_buf)
+						} else {
+							log.LogPrint(log.LOG_WARNING, "not find client or client status error, drop it")
+						}
+					}
 				case protocol_stack.PUBCOMP:
-
+					var publishData protocol_stack.MQTTPacketPublishData
+					var pubInfo protocol_stack.MQTTPubInfo
+					publishData.MQTTDeserialize_pubcomp(read_buf, num)
+					publishData.MQTTGetPublishInfo(&pubInfo)
+					var write_buf []byte = read_buf[:num]
+					for conn, client := range gloablClientsMap {
+						//if conn == localconn{
+						//	continue
+						//}
+						status, ok := client.pubStatus[pubInfo.PacketId]
+						if ok && status == protocol_stack.PUBCOMP {
+							log.LogPrint(log.LOG_DEBUG, "current status %d, remote status %d", mqttClientData.pubStatus[pubInfo.PacketId], client.pubStatus[pubInfo.PacketId])
+							mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.NONE
+							client.pubStatus[pubInfo.PacketId] = protocol_stack.NONE
+							delete(mqttClientData.pubStatus, pubInfo.PacketId)
+							delete(client.pubStatus, pubInfo.PacketId)
+							conn.Write(write_buf)
+						} else {
+							log.LogPrint(log.LOG_WARNING, "not find client or client status error, drop it")
+						}
+					}
 				case protocol_stack.PINGREQ:
 					var pingpongdata protocol_stack.MQTTPacketPingPongData
 					pingpongdata.MQTTDeserialize_ping(read_buf, num)
@@ -171,7 +225,6 @@ func ClientProcess(localconn net.Conn) {
 					localconn.Write(write_buf)
 				}
 			}
-
 
 		}
 	}
