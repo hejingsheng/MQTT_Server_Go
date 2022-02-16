@@ -152,15 +152,22 @@ func ClientProcess(localconn net.Conn) {
 							//}
 							for topic := range client.subInfo {
 								if topic == pubInfo.Topic {
-									client.conn.Write(write_buf)
-									if pubInfo.Qos == 1 {
-										mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBACK
-									} else if pubInfo.Qos == 2 {
-										mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBREC
-									} else if pubInfo.Qos == 0 {
+									if client.loginSuccess == 1 {
+										client.conn.Write(write_buf)
+										if pubInfo.Qos == 1 {
+											mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBACK
+										} else if pubInfo.Qos == 2 {
+											mqttClientData.pubStatus[pubInfo.PacketId] = protocol_stack.PUBREC
+										} else if pubInfo.Qos == 0 {
 
+										} else {
+											log.LogPrint(log.LOG_ERROR, routinId, "error Qos level %d", pubInfo.Qos)
+										}
 									} else {
-										log.LogPrint(log.LOG_ERROR, routinId, "error Qos level %d", pubInfo.Qos)
+										if pubInfo.Qos > 0 {
+											log.LogPrint(log.LOG_INFO, routinId, "client [%s] is offline, but qos(%d) > 0", client.clientId, pubInfo.Qos)
+											client.offlineMsg = append(client.offlineMsg, pubInfo)
+										}
 									}
 								}
 							}

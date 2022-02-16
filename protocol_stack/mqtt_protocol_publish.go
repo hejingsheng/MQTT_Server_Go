@@ -43,6 +43,43 @@ func (publishData *MQTTPacketPublishData)MQTTDeserialize_publish(buf []byte, len
 	return 0
 }
 
+func (publishData *MQTTPacketPublishData)MQTTSeserialize_publish(buf *[]byte, pubInfo MQTTPubInfo) int {
+	var header byte = 0
+	var remainLen int = 0
+	index := 0
+
+	header = PUBLISH
+	header <<= 4
+	header |= pubInfo.Qos << 1
+	//header |= 0x08 // set dup to 1 because this is retransmit by server
+	*buf = append(*buf, header)
+	index++
+	remainLen = 2+len(pubInfo.Topic)+len(pubInfo.Payload)
+	if pubInfo.Qos > 0 {
+		remainLen += 2
+	}
+	tmp, leftLen := mqttPacket_encode(remainLen)
+	for i := 0; i < tmp; i++ {
+		*buf = append(*buf, leftLen[i])
+	}
+	index += tmp
+	*buf = append(*buf, uint8(len(pubInfo.Topic)/256))
+	*buf = append(*buf, uint8(len(pubInfo.Topic)%256))
+	index += 2
+	t := []byte(pubInfo.Topic)
+	*buf = append(*buf, t...)
+	index += len(pubInfo.Topic)
+	if pubInfo.Qos > 0 {
+		*buf = append(*buf, uint8(pubInfo.PacketId/256))
+		*buf = append(*buf, uint8(pubInfo.PacketId%256))
+		index += 2
+	}
+	t = []byte(pubInfo.Payload)
+	*buf = append(*buf, t...)
+	index += len(pubInfo.Payload)
+	return index
+}
+
 func MQTTDeserialize_ack(buf []byte, len int, msgType uint8, packetId *uint16) int {
 	var header byte
 	var remainLen int
