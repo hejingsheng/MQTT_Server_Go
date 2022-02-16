@@ -26,7 +26,7 @@ func LogInit(level int) {
 	GlobalLog.level = level
 }
 
-func LogPrint(level int, format string, params ...interface{}) {
+func LogPrint(level int, cid string, format string, params ...interface{}) {
 	if GlobalLog.level > level {
 		return
 	}
@@ -43,9 +43,9 @@ func LogPrint(level int, format string, params ...interface{}) {
 	case LOG_TRACE:
 		levelStr = "[TRACE]";
 	case LOG_INFO:
-		levelStr = "[INFO]";
+		levelStr = "[INFOR]";
 	case LOG_WARNING:
-		levelStr = "[WARNING]";
+		levelStr = "[WARNG]";
 	case LOG_ERROR:
 		levelStr = "[ERROR]";
 	case LOG_PANIC:
@@ -53,7 +53,7 @@ func LogPrint(level int, format string, params ...interface{}) {
 	default:
 		return;
 	}
-	logString := fmt.Sprintf("%d/%02d/%02d %02d:%02d:%02d %03d->%s", year,month,day,hour,minute,second,millsecond,levelStr)
+	logString := fmt.Sprintf("%d/%02d/%02d %02d:%02d:%02d %03d->%s:[%s]", year,month,day,hour,minute,second,millsecond,levelStr,cid)
 	if params == nil {
 		logString += format
 	} else {
