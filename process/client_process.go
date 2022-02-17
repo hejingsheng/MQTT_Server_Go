@@ -15,15 +15,15 @@ type MqttClientInfo struct {
 	pingperiod   uint16
 	clearSession uint8
 	loginSuccess byte
-	conn  net.Conn
+	conn         net.Conn
 
 	//subInfo []protocol_stack.MqttSubInfo
-	subInfo   map[string]uint8 // subscribe topic  key = topic  value = qos
-	pubStatus map[uint16]uint8 // publish msg status key = packetId value = status for qos1 and qos2 status is puback pubrec pubrel pubcomp
+	subInfo    map[string]uint8                       // subscribe topic  key = topic  value = qos
+	pubStatus  map[uint16]uint8                       // publish msg status key = packetId value = status for qos1 and qos2 status is puback pubrec pubrel pubcomp
 	offlineMsg []protocol_stack.MQTTPacketPublishData // save offline msg
 }
 
-func (mqttClientData *MqttClientInfo)ProcessSubscribe(routinId string, read_buf []byte, num int) int {
+func (mqttClientData *MqttClientInfo) ProcessSubscribe(routinId string, read_buf []byte, num int) int {
 	if mqttClientData.loginSuccess != 1 {
 		log.LogPrint(log.LOG_ERROR, routinId, "client not login")
 		return -1
@@ -39,7 +39,7 @@ func (mqttClientData *MqttClientInfo)ProcessSubscribe(routinId string, read_buf 
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo)ProcessUnSubscribe(routinId string, read_buf []byte, num int) int {
+func (mqttClientData *MqttClientInfo) ProcessUnSubscribe(routinId string, read_buf []byte, num int) int {
 	if mqttClientData.loginSuccess != 1 {
 		log.LogPrint(log.LOG_ERROR, routinId, "client not login")
 	} else {
@@ -54,7 +54,7 @@ func (mqttClientData *MqttClientInfo)ProcessUnSubscribe(routinId string, read_bu
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo)ProcessPublish(routinId string, read_buf []byte, num int) int {
+func (mqttClientData *MqttClientInfo) ProcessPublish(routinId string, read_buf []byte, num int) int {
 	if mqttClientData.loginSuccess != 1 {
 		log.LogPrint(log.LOG_ERROR, routinId, "client not login")
 	} else {
@@ -104,7 +104,7 @@ func (mqttClientData *MqttClientInfo)ProcessPublish(routinId string, read_buf []
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo)ProcessPublishAck(routinId string, read_buf []byte, num int) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishAck(routinId string, read_buf []byte, num int) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_puback(read_buf, num)
 	var write_buf []byte = read_buf[:num]
@@ -123,7 +123,7 @@ func (mqttClientData *MqttClientInfo)ProcessPublishAck(routinId string, read_buf
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo)ProcessPublishRec(routinId string, read_buf []byte, num int) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishRec(routinId string, read_buf []byte, num int) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_pubrec(read_buf, num)
 	var write_buf []byte = read_buf[:num]
@@ -150,7 +150,7 @@ func (mqttClientData *MqttClientInfo)ProcessPublishRec(routinId string, read_buf
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo)ProcessPublishRel(routinId string, read_buf []byte, num int) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishRel(routinId string, read_buf []byte, num int) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_pubrel(read_buf, num)
 	var write_buf []byte = read_buf[:num]
@@ -176,7 +176,7 @@ func (mqttClientData *MqttClientInfo)ProcessPublishRel(routinId string, read_buf
 	}
 	return 0
 }
-func (mqttClientData *MqttClientInfo)ProcessPublishComp(routinId string, read_buf []byte, num int) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishComp(routinId string, read_buf []byte, num int) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_pubcomp(read_buf, num)
 	var write_buf []byte = read_buf[:num]
@@ -211,7 +211,7 @@ func init() {
 
 func ClientProcess(localconn net.Conn) {
 
-	var routinId string  // use client struct address as thread id
+	var routinId string // use client struct address as thread id
 	var mqttClientData *MqttClientInfo = nil
 	//mqttClientData := MqttClientInfo{
 	//	clientId:     "",
@@ -223,7 +223,7 @@ func ClientProcess(localconn net.Conn) {
 	//}
 
 	routinId = utils.GeneralRoutinId(12)
-	log.LogPrint(log.LOG_INFO,  routinId, "start a tcp client")
+	log.LogPrint(log.LOG_INFO, routinId, "start a tcp client")
 	defer func() {
 		log.LogPrint(log.LOG_INFO, routinId, "client [%s:%d] close exit process", mqttClientData.clientId, mqttClientData.clearSession)
 		if mqttClientData.clearSession == 1 { // client request clear session in connect data
@@ -256,12 +256,12 @@ func ClientProcess(localconn net.Conn) {
 					num, ret := conndata.MQTTSeserialize_connack(&write_buf)
 					log.LogPrint(log.LOG_DEBUG, routinId, "write %d data, ret %d", num, ret)
 					if ret == 0 {
-						var username, password, clientId string
-						pingperiod, clearSession := conndata.MQTT_GetConnectInfo(&username, &password, &clientId)
-						_, ok := gloablClientsMap[clientId]
+						//var username, password, clientId string
+						//pingperiod, clearSession := conndata.MQTT_GetConnectInfo(&username, &password, &clientId)
+						_, ok := gloablClientsMap[conndata.ClientID]
 						if ok {
 							// this clientId have login and not clear session
-							mqttClientData = gloablClientsMap[clientId]
+							mqttClientData = gloablClientsMap[conndata.ClientID]
 						} else {
 							// first login or clear session need new client struct
 							mqttClientData = new(MqttClientInfo)
@@ -270,11 +270,11 @@ func ClientProcess(localconn net.Conn) {
 							mqttClientData.offlineMsg = make([]protocol_stack.MQTTPacketPublishData, 0)
 						}
 						mqttClientData.loginSuccess = 1
-						mqttClientData.clientId = clientId
-						mqttClientData.username = username
-						mqttClientData.password = password
-						mqttClientData.pingperiod = pingperiod
-						mqttClientData.clearSession = clearSession
+						mqttClientData.clientId = conndata.ClientID
+						mqttClientData.username = conndata.Username
+						mqttClientData.password = conndata.Password
+						mqttClientData.pingperiod = conndata.KeepAliveInterval
+						mqttClientData.clearSession = conndata.Cleansession
 						mqttClientData.conn = localconn
 						globalClientsMapLock.Lock()
 						gloablClientsMap[mqttClientData.clientId] = mqttClientData
