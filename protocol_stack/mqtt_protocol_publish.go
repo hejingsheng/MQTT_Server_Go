@@ -1,19 +1,19 @@
 package protocol_stack
 
-type MQTTPubInfo struct {
+//type MQTTPubInfo struct {
+//	Topic string
+//	Qos uint8
+//	Payload string
+//	PacketId uint16
+//}
+
+type MQTTPacketPublishData struct {
+	Dup uint8
+	PacketId uint16
+	Retained uint8
 	Topic string
 	Qos uint8
 	Payload string
-	PacketId uint16
-}
-
-type MQTTPacketPublishData struct {
-	dup uint8
-	packetId uint16
-	retained uint8
-	topic string
-	qos uint8
-	payload string
 }
 
 func (publishData *MQTTPacketPublishData)MQTTDeserialize_publish(buf []byte, len int) int {
@@ -27,35 +27,36 @@ func (publishData *MQTTPacketPublishData)MQTTDeserialize_publish(buf []byte, len
 	if mqttDataType != PUBLISH {
 		return -1;
 	}
-	publishData.dup = header & 0x08 >> 3
-	publishData.qos = header & 0x06 >> 1
-	publishData.retained = header & 0x01
+	publishData.Dup = header & 0x08 >> 3
+	publishData.Qos = header & 0x06 >> 1
+	publishData.Retained = header & 0x01
 	leftdata := buf[index:len]
 	index += mqttPacket_decode(leftdata, &remainLen)
 	leftdata = buf[index:len]
-	index += mqttPacket_readString(leftdata, &publishData.topic)
-	if publishData.qos > 0 {
-		publishData.packetId = uint16(buf[index]) << 8 | uint16(buf[index+1])
+	index += mqttPacket_readString(leftdata, &publishData.Topic)
+	if publishData.Qos > 0 {
+		publishData.PacketId = uint16(buf[index]) << 8 | uint16(buf[index+1])
 		index += 2
 	}
 	leftdata = buf[index:len]
-	publishData.payload = string(leftdata)
+	publishData.Payload = string(leftdata)
 	return 0
 }
 
-func (publishData *MQTTPacketPublishData)MQTTSeserialize_publish(buf *[]byte, pubInfo MQTTPubInfo) int {
+func (publishData *MQTTPacketPublishData)MQTTSeserialize_publish(buf *[]byte) int {
 	var header byte = 0
 	var remainLen int = 0
 	index := 0
 
 	header = PUBLISH
 	header <<= 4
-	header |= pubInfo.Qos << 1
-	//header |= 0x08 // set dup to 1 because this is retransmit by server
+	header |= publishData.Qos << 1
+	header |= publishData.Dup << 3
+	header |= publishData.Retained
 	*buf = append(*buf, header)
 	index++
-	remainLen = 2+len(pubInfo.Topic)+len(pubInfo.Payload)
-	if pubInfo.Qos > 0 {
+	remainLen = 2+len(publishData.Topic)+len(publishData.Payload)
+	if publishData.Qos > 0 {
 		remainLen += 2
 	}
 	tmp, leftLen := mqttPacket_encode(remainLen)
@@ -63,20 +64,20 @@ func (publishData *MQTTPacketPublishData)MQTTSeserialize_publish(buf *[]byte, pu
 		*buf = append(*buf, leftLen[i])
 	}
 	index += tmp
-	*buf = append(*buf, uint8(len(pubInfo.Topic)/256))
-	*buf = append(*buf, uint8(len(pubInfo.Topic)%256))
+	*buf = append(*buf, uint8(len(publishData.Topic)/256))
+	*buf = append(*buf, uint8(len(publishData.Topic)%256))
 	index += 2
-	t := []byte(pubInfo.Topic)
+	t := []byte(publishData.Topic)
 	*buf = append(*buf, t...)
-	index += len(pubInfo.Topic)
-	if pubInfo.Qos > 0 {
-		*buf = append(*buf, uint8(pubInfo.PacketId/256))
-		*buf = append(*buf, uint8(pubInfo.PacketId%256))
+	index += len(publishData.Topic)
+	if publishData.Qos > 0 {
+		*buf = append(*buf, uint8(publishData.PacketId/256))
+		*buf = append(*buf, uint8(publishData.PacketId%256))
 		index += 2
 	}
-	t = []byte(pubInfo.Payload)
+	t = []byte(publishData.Payload)
 	*buf = append(*buf, t...)
-	index += len(pubInfo.Payload)
+	index += len(publishData.Payload)
 	return index
 }
 
@@ -99,25 +100,25 @@ func MQTTDeserialize_ack(buf []byte, len int, msgType uint8, packetId *uint16) i
 }
 
 func (publishData *MQTTPacketPublishData)MQTTDeserialize_puback(buf []byte, len int) int {
-	return MQTTDeserialize_ack(buf, len, PUBACK, &publishData.packetId)
+	return MQTTDeserialize_ack(buf, len, PUBACK, &publishData.PacketId)
 }
 
 func (publishData *MQTTPacketPublishData)MQTTDeserialize_pubrec(buf []byte, len int) int {
-	return MQTTDeserialize_ack(buf, len, PUBREC, &publishData.packetId)
+	return MQTTDeserialize_ack(buf, len, PUBREC, &publishData.PacketId)
 }
 
 func (publishData *MQTTPacketPublishData)MQTTDeserialize_pubrel(buf []byte, len int) int {
-	return MQTTDeserialize_ack(buf, len, PUBREL, &publishData.packetId)
+	return MQTTDeserialize_ack(buf, len, PUBREL, &publishData.PacketId)
 }
 
 func (publishData *MQTTPacketPublishData)MQTTDeserialize_pubcomp(buf []byte, len int) int {
-	return MQTTDeserialize_ack(buf, len, PUBCOMP, &publishData.packetId)
+	return MQTTDeserialize_ack(buf, len, PUBCOMP, &publishData.PacketId)
 }
 
-func (publishData *MQTTPacketPublishData)MQTTGetPublishInfo(pubInfo *MQTTPubInfo) int {
-	pubInfo.Topic = publishData.topic
-	pubInfo.Qos = publishData.qos
-	pubInfo.Payload = publishData.payload
-	pubInfo.PacketId = publishData.packetId
-	return 0
-}
+//func (publishData *MQTTPacketPublishData)MQTTGetPublishInfo(pubInfo *MQTTPubInfo) int {
+//	pubInfo.Topic = publishData.topic
+//	pubInfo.Qos = publishData.qos
+//	pubInfo.Payload = publishData.payload
+//	pubInfo.PacketId = publishData.packetId
+//	return 0
+//}
