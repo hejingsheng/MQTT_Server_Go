@@ -115,6 +115,48 @@ func (publishData *MQTTPacketPublishData)MQTTDeserialize_pubcomp(buf []byte, len
 	return MQTTDeserialize_ack(buf, len, PUBCOMP, &publishData.PacketId)
 }
 
+func MQTTSeserialize_ack(buf *[]byte, msgType uint8, publishData *MQTTPacketPublishData) int {
+	var header byte = 0
+	index := 0
+
+	header = msgType
+	header <<= 4
+	if msgType == PUBREL {
+		header |= 1 << 1
+	} else {
+		header |= 0 << 1
+	}
+	header |= publishData.Dup << 3
+	header |= publishData.Retained
+	*buf = append(*buf, header)
+	index++
+	tmp, leftLen := mqttPacket_encode(2)
+	for i := 0; i < tmp; i++ {
+		*buf = append(*buf, leftLen[i])
+	}
+	index += tmp
+	*buf = append(*buf, uint8(publishData.PacketId/256))
+	*buf = append(*buf, uint8(publishData.PacketId%256))
+	index += 2
+	return index
+}
+
+func (publishData *MQTTPacketPublishData)MQTTSeserialize_puback(buf *[]byte) int {
+	return MQTTSeserialize_ack(buf, PUBACK, publishData)
+}
+
+func (publishData *MQTTPacketPublishData)MQTTSeserialize_pubrec(buf *[]byte) int {
+	return MQTTSeserialize_ack(buf, PUBREC, publishData)
+}
+
+func (publishData *MQTTPacketPublishData)MQTTSeserialize_pubrel(buf *[]byte) int {
+	return MQTTSeserialize_ack(buf, PUBREL, publishData)
+}
+
+func (publishData *MQTTPacketPublishData)MQTTSeserialize_pubcomp(buf *[]byte) int {
+	return MQTTSeserialize_ack(buf, PUBCOMP, publishData)
+}
+
 //func (publishData *MQTTPacketPublishData)MQTTGetPublishInfo(pubInfo *MQTTPubInfo) int {
 //	pubInfo.Topic = publishData.topic
 //	pubInfo.Qos = publishData.qos
