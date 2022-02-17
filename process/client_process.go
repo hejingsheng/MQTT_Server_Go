@@ -23,6 +23,155 @@ type MqttClientInfo struct {
 	offlineMsg []protocol_stack.MQTTPacketPublishData // save offline msg
 }
 
+func (mqttClientData *MqttClientInfo)ProcessSubscribe(routinId string, read_buf []byte, num int) int {
+	if mqttClientData.loginSuccess != 1 {
+		log.LogPrint(log.LOG_ERROR, routinId, "client not login")
+		return -1
+	} else {
+		var subscribeData protocol_stack.MQTTPacketSubscribeData
+		topicNum := subscribeData.MQTTDeserialize_subscribe(read_buf, num)
+		log.LogPrint(log.LOG_INFO, routinId, "client [%s] subscribe %d topic", mqttClientData.clientId, topicNum)
+		subscribeData.MQTTGetSubInfo(mqttClientData.subInfo, topicNum)
+		var write_buf []byte = make([]byte, 0)
+		subscribeData.MQTTSeserialize_suback(&write_buf, topicNum)
+		mqttClientData.conn.Write(write_buf)
+	}
+	return 0
+}
+
+func (mqttClientData *MqttClientInfo)ProcessUnSubscribe(routinId string, read_buf []byte, num int) int {
+	if mqttClientData.loginSuccess != 1 {
+		log.LogPrint(log.LOG_ERROR, routinId, "client not login")
+	} else {
+		var unSubscribeData protocol_stack.MQTTPacketUnSubscribeData
+		topicNum := unSubscribeData.MQTTDeserialize_unsubscribe(read_buf, num)
+		log.LogPrint(log.LOG_INFO, routinId, "client [%s] unsubscribe %d topic", mqttClientData.clientId, topicNum)
+		var write_buf []byte = make([]byte, 0)
+		unSubscribeData.MQTTRemoveUnSubTopic(mqttClientData.subInfo)
+		unSubscribeData.MQTTSeserialize_unsuback(&write_buf)
+		mqttClientData.conn.Write(write_buf)
+	}
+	return 0
+}
+
+func (mqttClientData *MqttClientInfo)ProcessPublish(routinId string, read_buf []byte, num int) int {
+	if mqttClientData.loginSuccess != 1 {
+		log.LogPrint(log.LOG_ERROR, routinId, "client not login")
+	} else {
+		var publishData protocol_stack.MQTTPacketPublishData
+		ret := publishData.MQTTDeserialize_publish(read_buf, num)
+		//publishData.MQTTGetPublishInfo(&pubInfo)
+		log.LogPrint(log.LOG_INFO, routinId, "client [%s] public msg %d, public %s,payload %d", mqttClientData.clientId, ret, publishData.Topic, publishData.Qos)
+		var write_buf []byte = read_buf[:num]
+		for _, client := range gloablClientsMap {
+			//if conn == localconn{
+			//	continue
+			//}
+			for topic := range client.subInfo {
+				if topic == publishData.Topic {
+					if client.loginSuccess == 1 {
+						client.conn.Write(write_buf)
+						if publishData.Qos == 1 {
+							mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBACK
+						} else if publishData.Qos == 2 {
+							mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBREC
+						} else if publishData.Qos == 0 {
+
+						} else {
+							log.LogPrint(log.LOG_ERROR, routinId, "error Qos level %d", publishData.Qos)
+						}
+					} else {
+						if publishData.Qos > 0 {
+							log.LogPrint(log.LOG_INFO, routinId, "client [%s] is offline, but qos(%d) > 0", client.clientId, publishData.Qos)
+							client.offlineMsg = append(client.offlineMsg, publishData)
+						}
+					}
+				}
+			}
+		}
+	}
+	return 0
+}
+
+func (mqttClientData *MqttClientInfo)ProcessPublishAck(routinId string, read_buf []byte, num int) int {
+	var publishData protocol_stack.MQTTPacketPublishData
+	publishData.MQTTDeserialize_puback(read_buf, num)
+	var write_buf []byte = read_buf[:num]
+	for _, client := range gloablClientsMap {
+		//if conn == localconn{
+		//	continue
+		//}
+		status, ok := client.pubStatus[publishData.PacketId]
+		if ok && status == protocol_stack.PUBACK {
+			client.conn.Write(write_buf)
+			delete(client.pubStatus, publishData.PacketId)
+		} else {
+			log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
+		}
+	}
+	return 0
+}
+
+func (mqttClientData *MqttClientInfo)ProcessPublishRec(routinId string, read_buf []byte, num int) int {
+	var publishData protocol_stack.MQTTPacketPublishData
+	publishData.MQTTDeserialize_pubrec(read_buf, num)
+	var write_buf []byte = read_buf[:num]
+	for _, client := range gloablClientsMap {
+		//if conn == localconn{
+		//	continue
+		//}
+		status, ok := client.pubStatus[publishData.PacketId]
+		if ok && status == protocol_stack.PUBREC {
+			mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBREL
+			client.conn.Write(write_buf)
+		} else {
+			log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
+		}
+	}
+	return 0
+}
+
+func (mqttClientData *MqttClientInfo)ProcessPublishRel(routinId string, read_buf []byte, num int) int {
+	var publishData protocol_stack.MQTTPacketPublishData
+	publishData.MQTTDeserialize_pubrel(read_buf, num)
+	var write_buf []byte = read_buf[:num]
+	for _, client := range gloablClientsMap {
+		//if conn == localconn{
+		//	continue
+		//}
+		status, ok := client.pubStatus[publishData.PacketId]
+		if ok && status == protocol_stack.PUBREL {
+			mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBCOMP
+			client.conn.Write(write_buf)
+		} else {
+			log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
+		}
+	}
+	return 0
+}
+func (mqttClientData *MqttClientInfo)ProcessPublishComp(routinId string, read_buf []byte, num int) int {
+	var publishData protocol_stack.MQTTPacketPublishData
+	publishData.MQTTDeserialize_pubcomp(read_buf, num)
+	var write_buf []byte = read_buf[:num]
+	for _, client := range gloablClientsMap {
+		//if conn == localconn{
+		//	continue
+		//}
+		status, ok := client.pubStatus[publishData.PacketId]
+		if ok && status == protocol_stack.PUBCOMP {
+			log.LogPrint(log.LOG_DEBUG, routinId, "client [%s] current status %d, remote status %d", mqttClientData.clientId, mqttClientData.pubStatus[publishData.PacketId], client.pubStatus[publishData.PacketId])
+			mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.NONE
+			client.pubStatus[publishData.PacketId] = protocol_stack.NONE
+			delete(mqttClientData.pubStatus, publishData.PacketId)
+			delete(client.pubStatus, publishData.PacketId)
+			client.conn.Write(write_buf)
+		} else {
+			log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
+		}
+	}
+	return 0
+}
+
 var (
 	gloablClientsMap     map[string]*MqttClientInfo
 	globalClientsMapLock sync.Mutex
@@ -49,7 +198,7 @@ func ClientProcess(localconn net.Conn) {
 	routinId = utils.GeneralRoutinId(12)
 	log.LogPrint(log.LOG_INFO,  routinId, "start a tcp client")
 	defer func() {
-		log.LogPrint(log.LOG_INFO, routinId, "one client close exit process")
+		log.LogPrint(log.LOG_INFO, routinId, "client [%s:%d] close exit process", mqttClientData.clientId, mqttClientData.clearSession)
 		if mqttClientData.clearSession == 1 { // client request clear session in connect data
 			globalClientsMapLock.Lock()
 			delete(gloablClientsMap, mqttClientData.clientId)
@@ -105,6 +254,13 @@ func ClientProcess(localconn net.Conn) {
 						globalClientsMapLock.Unlock()
 						log.LogPrint(log.LOG_INFO, routinId, "this client [%s:%s] login success", mqttClientData.clientId, mqttClientData.username)
 						localconn.Write(write_buf)
+						for _, offlineMsg := range mqttClientData.offlineMsg {
+							//var msg *protocol_stack.MQTTPacketPublishData = &offlineMsg
+							write_buf = []byte{}
+							offlineMsg.MQTTSeserialize_publish(&write_buf)
+							localconn.Write(write_buf)
+							//msg.MQTTSeserialize_publish()
+						}
 					} else {
 						localconn.Write(write_buf)
 						localconn.Close()
@@ -113,133 +269,19 @@ func ClientProcess(localconn net.Conn) {
 					log.LogPrint(log.LOG_INFO, routinId, "client [%s] send disconnect req", mqttClientData.clientId)
 					localconn.Close()
 				case protocol_stack.SUBSCRIBE:
-					if mqttClientData.loginSuccess != 1 {
-						log.LogPrint(log.LOG_ERROR, routinId, "client not login")
-					} else {
-						var subscribeData protocol_stack.MQTTPacketSubscribeData
-						topicNum := subscribeData.MQTTDeserialize_subscribe(read_buf, num)
-						log.LogPrint(log.LOG_INFO, routinId, "client [%s] subscribe %d topic", mqttClientData.clientId, topicNum)
-						var write_buf []byte = make([]byte, 0)
-						subscribeData.MQTTGetSubInfo(mqttClientData.subInfo, topicNum)
-						subscribeData.MQTTSeserialize_suback(&write_buf, topicNum)
-						localconn.Write(write_buf)
-					}
+					mqttClientData.ProcessSubscribe(routinId, read_buf, num)
 				case protocol_stack.UNSUBSCRIBE:
-					if mqttClientData.loginSuccess != 1 {
-						log.LogPrint(log.LOG_ERROR, routinId, "client not login")
-					} else {
-						var unSubscribeData protocol_stack.MQTTPacketUnSubscribeData
-						topicNum := unSubscribeData.MQTTDeserialize_unsubscribe(read_buf, num)
-						log.LogPrint(log.LOG_INFO, routinId, "client [%s] unsubscribe %d topic", mqttClientData.clientId, topicNum)
-						var write_buf []byte = make([]byte, 0)
-						unSubscribeData.MQTTRemoveUnSubTopic(mqttClientData.subInfo)
-						unSubscribeData.MQTTSeserialize_unsuback(&write_buf)
-						localconn.Write(write_buf)
-					}
+					mqttClientData.ProcessUnSubscribe(routinId, read_buf, num)
 				case protocol_stack.PUBLISH:
-					if mqttClientData.loginSuccess != 1 {
-						log.LogPrint(log.LOG_ERROR, routinId, "client not login")
-					} else {
-						var publishData protocol_stack.MQTTPacketPublishData
-						ret := publishData.MQTTDeserialize_publish(read_buf, num)
-						//publishData.MQTTGetPublishInfo(&pubInfo)
-						log.LogPrint(log.LOG_INFO, routinId, "client [%s] public msg %d, public %s,payload %d", mqttClientData.clientId, ret, publishData.Topic, publishData.Qos)
-						var write_buf []byte = read_buf[:num]
-						for _, client := range gloablClientsMap {
-							//if conn == localconn{
-							//	continue
-							//}
-							for topic := range client.subInfo {
-								if topic == publishData.Topic {
-									if client.loginSuccess == 1 {
-										client.conn.Write(write_buf)
-										if publishData.Qos == 1 {
-											mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBACK
-										} else if publishData.Qos == 2 {
-											mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBREC
-										} else if publishData.Qos == 0 {
-
-										} else {
-											log.LogPrint(log.LOG_ERROR, routinId, "error Qos level %d", publishData.Qos)
-										}
-									} else {
-										if publishData.Qos > 0 {
-											log.LogPrint(log.LOG_INFO, routinId, "client [%s] is offline, but qos(%d) > 0", client.clientId, publishData.Qos)
-											client.offlineMsg = append(client.offlineMsg, publishData)
-										}
-									}
-								}
-							}
-						}
-					}
+					mqttClientData.ProcessPublish(routinId, read_buf, num)
 				case protocol_stack.PUBACK:
-					var publishData protocol_stack.MQTTPacketPublishData
-					publishData.MQTTDeserialize_puback(read_buf, num)
-					var write_buf []byte = read_buf[:num]
-					for _, client := range gloablClientsMap {
-						//if conn == localconn{
-						//	continue
-						//}
-						status, ok := client.pubStatus[publishData.PacketId]
-						if ok && status == protocol_stack.PUBACK {
-							client.conn.Write(write_buf)
-							delete(client.pubStatus, publishData.PacketId)
-						} else {
-							log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
-						}
-					}
+					mqttClientData.ProcessPublishAck(routinId, read_buf, num)
 				case protocol_stack.PUBREC:
-					var publishData protocol_stack.MQTTPacketPublishData
-					publishData.MQTTDeserialize_pubrec(read_buf, num)
-					var write_buf []byte = read_buf[:num]
-					for _, client := range gloablClientsMap {
-						//if conn == localconn{
-						//	continue
-						//}
-						status, ok := client.pubStatus[publishData.PacketId]
-						if ok && status == protocol_stack.PUBREC {
-							mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBREL
-							client.conn.Write(write_buf)
-						} else {
-							log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
-						}
-					}
+					mqttClientData.ProcessPublishRec(routinId, read_buf, num)
 				case protocol_stack.PUBREL:
-					var publishData protocol_stack.MQTTPacketPublishData
-					publishData.MQTTDeserialize_pubrel(read_buf, num)
-					var write_buf []byte = read_buf[:num]
-					for _, client := range gloablClientsMap {
-						//if conn == localconn{
-						//	continue
-						//}
-						status, ok := client.pubStatus[publishData.PacketId]
-						if ok && status == protocol_stack.PUBREL {
-							mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.PUBCOMP
-							client.conn.Write(write_buf)
-						} else {
-							log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
-						}
-					}
+					mqttClientData.ProcessPublishRel(routinId, read_buf, num)
 				case protocol_stack.PUBCOMP:
-					var publishData protocol_stack.MQTTPacketPublishData
-					publishData.MQTTDeserialize_pubcomp(read_buf, num)
-					var write_buf []byte = read_buf[:num]
-					for _, client := range gloablClientsMap {
-						//if conn == localconn{
-						//	continue
-						//}
-						status, ok := client.pubStatus[publishData.PacketId]
-						if ok && status == protocol_stack.PUBCOMP {
-							log.LogPrint(log.LOG_DEBUG, routinId,"client [%s] current status %d, remote status %d", mqttClientData.clientId, mqttClientData.pubStatus[publishData.PacketId], client.pubStatus[publishData.PacketId])
-							mqttClientData.pubStatus[publishData.PacketId] = protocol_stack.NONE
-							client.pubStatus[publishData.PacketId] = protocol_stack.NONE
-							delete(mqttClientData.pubStatus, publishData.PacketId)
-							delete(client.pubStatus, publishData.PacketId)
-							client.conn.Write(write_buf)
-						} else {
-							log.LogPrint(log.LOG_WARNING, routinId, "not find client or client status error, drop it")
-						}
-					}
+					mqttClientData.ProcessPublishComp(routinId, read_buf, num)
 				case protocol_stack.PINGREQ:
 					var pingpongdata protocol_stack.MQTTPacketPingPongData
 					pingpongdata.MQTTDeserialize_ping(read_buf, num)
