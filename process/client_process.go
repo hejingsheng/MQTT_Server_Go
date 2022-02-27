@@ -209,7 +209,7 @@ func init() {
 	gloablClientsMap = make(map[string]*MqttClientInfo, 1)
 }
 
-func ClientProcess(localconn net.Conn) {
+func ClientProcess(localconn net.Conn, cycleCh chan int) {
 
 	var routinId string // use client struct address as thread id
 	var mqttClientData *MqttClientInfo = nil
@@ -281,6 +281,7 @@ func ClientProcess(localconn net.Conn) {
 						globalClientsMapLock.Unlock()
 						log.LogPrint(log.LOG_INFO, routinId, "this client [%s:%s] login success", mqttClientData.clientId, mqttClientData.username)
 						localconn.Write(write_buf)
+						cycleCh <- 1
 						for _, offlineMsg := range mqttClientData.offlineMsg {
 							//var msg *protocol_stack.MQTTPacketPublishData = &offlineMsg
 							write_buf = []byte{}

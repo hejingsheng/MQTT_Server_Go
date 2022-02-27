@@ -8,7 +8,7 @@ import (
 
 func main() {
 	mainThreadId := "main"
-	log.LogInit(log.LOG_INFO)
+	log.LogInit(log.LOG_DEBUG)
 	log.LogPrint(log.LOG_INFO, mainThreadId, "MQTT Server Running...")
 
 	listen, err := net.Listen("tcp", "0.0.0.0:1883")
@@ -18,6 +18,9 @@ func main() {
 	}
 	defer listen.Close()
 
+	cycleChannal := make(chan int)
+	go process.ClientsMapCycle(cycleChannal)
+
 	for {
 		log.LogPrint(log.LOG_INFO, mainThreadId, "wait a client connect")
 		conn, err := listen.Accept()
@@ -25,7 +28,7 @@ func main() {
 			log.LogPrint(log.LOG_ERROR, mainThreadId, "client connect error")
 		} else {
 			log.LogPrint(log.LOG_INFO, mainThreadId, "a client connect success %v", conn.RemoteAddr().String())
-			go process.ClientProcess(conn)
+			go process.ClientProcess(conn, cycleChannal)
 		}
 
 	}
