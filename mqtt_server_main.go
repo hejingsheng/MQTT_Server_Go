@@ -18,7 +18,7 @@ func main() {
 	}
 	defer listen.Close()
 
-	cycleChannal := make(chan int)
+	cycleChannal := make(chan process.CycleRoutinMsg)
 	go process.ClientsMapCycle(cycleChannal)
 
 	for {
