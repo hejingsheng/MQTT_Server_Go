@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/mqtt_server/MQTT_Server_Go/log"
+	"github.com/mqtt_server/MQTT_Server_Go/manager"
 	"github.com/mqtt_server/MQTT_Server_Go/process"
 	"net"
 )
@@ -20,6 +21,7 @@ func main() {
 
 	cycleChannal := make(chan process.CycleRoutinMsg)
 	go process.ClientsMapCycle(cycleChannal)
+	go manager.Http_Manager_Server()
 
 	for {
 		log.LogPrint(log.LOG_INFO, mainThreadId, "wait a client connect")
