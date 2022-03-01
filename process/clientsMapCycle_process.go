@@ -21,14 +21,14 @@ func processMsg(routinId string, msg CycleRoutinMsg) {
 		mqttClient,ok := msg.MsgBody.(*MqttClientInfo)
 		if ok {
 			log.LogPrint(log.LOG_DEBUG, routinId,"read from cycle channal one client login")
-			gloablClientsMap[mqttClient.clientId] = mqttClient
+			GloablClientsMap[mqttClient.ClientId] = mqttClient
 		} else {
 			log.LogPrint(log.LOG_ERROR, routinId, "add client msg data is error")
 		}
 	case MSG_DEL_CLIENT:
 		clientId,ok := msg.MsgBody.(string)
 		if ok {
-			delete(gloablClientsMap, clientId)
+			delete(GloablClientsMap, clientId)
 		} else {
 			log.LogPrint(log.LOG_INFO, routinId, "del client msg data is error")
 		}
@@ -49,10 +49,10 @@ func ClientsMapCycle(cycle chan CycleRoutinMsg) {
 		var data CycleRoutinMsg
 		select {
 		case <- ticker.C:
-			for _, client := range gloablClientsMap {
+			for _, client := range GloablClientsMap {
 				client.heartTimeout--
 				if client.heartTimeout < 0 {
-					log.LogPrint(log.LOG_WARNING, routinId, "client [%s] heart timeout", client.clientId)
+					log.LogPrint(log.LOG_WARNING, routinId, "client [%s] heart timeout", client.ClientId)
 					client.conn.Close()
 				}
 			}
