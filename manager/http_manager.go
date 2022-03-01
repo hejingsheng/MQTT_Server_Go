@@ -1,14 +1,44 @@
 package manager
 
-import "net/http"
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
 
-func sayHello(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Hello World!"))
+type Product struct {
+	Name      string
+	ProductID int64
+	Number    int
+	Price     float64
+	IsOnSale  bool
+}
+
+func OnAjax(w http.ResponseWriter, r *http.Request) {
+
+	p := &Product{}
+	p.Name = "Xiao mi 6"
+	p.IsOnSale = true
+	p.Number = 10000
+	p.Price = 2499.00
+	p.ProductID = 1
+
+	jsonResp, err := json.Marshal(p)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResp)
+
+	fmt.Println(string(jsonResp))
+
 }
 
 func Http_Manager_Server() {
 
-	http.HandleFunc("/test", sayHello)
+	http.HandleFunc("/test", OnAjax)
 
 	//2.设置监听的TCP地址并启动服务
 	//参数1：TCP地址(IP+Port)
