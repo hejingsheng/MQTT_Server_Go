@@ -1,18 +1,40 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"github.com/mqtt_server/MQTT_Server_Go/config"
 	"github.com/mqtt_server/MQTT_Server_Go/log"
 	"github.com/mqtt_server/MQTT_Server_Go/manager"
 	"github.com/mqtt_server/MQTT_Server_Go/process"
 	"net"
 )
 
+var SOFTWARE_VERSION string = "V0.0.1"
+var SOFTWARE_AUTHOR  string = "Jack He"
+
+var c = flag.String("c", "", "Config File Path")
+
+func parseArgs() string {
+	flag.Parse()
+	return *c
+}
+
 func main() {
 	mainThreadId := "main"
 	log.LogInit(log.LOG_DEBUG)
+	log.LogPrint(log.LOG_INFO, mainThreadId, "MQTT Server Version:%s, Author:%s", SOFTWARE_VERSION, SOFTWARE_AUTHOR)
 	log.LogPrint(log.LOG_INFO, mainThreadId, "MQTT Server Running...")
 
-	listen, err := net.Listen("tcp", "0.0.0.0:1883")
+	configfile := parseArgs()
+	config.ConfigFileInit(configfile)
+
+	port, err := config.ReadConfigValueInt("mqtt", "port")
+	if err != nil {
+		port = 1883
+	}
+	address := fmt.Sprintf("0.0.0.0:%d",port)
+	listen, err := net.Listen("tcp", address)
 	if err != nil {
 		log.LogPrint(log.LOG_ERROR, mainThreadId, "listen error")
 		return

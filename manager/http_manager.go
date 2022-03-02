@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"fmt"
+	"github.com/mqtt_server/MQTT_Server_Go/config"
 	"net/http"
 )
 
@@ -16,8 +18,12 @@ func Http_Manager_Server() {
 	mqttServerMux.Handle("/getClientList", &clientListHandle)
 	mqttServerMux.Handle("/getClientSub", &clientSubHandle)
 	mqttServerMux.Handle("/getOfflienMsg", &clientOffMsgHandle)
-
-	server := &http.Server{Addr: "127.0.0.1:9000", Handler: &mqttServerMux}
+	port, err := config.ReadConfigValueInt("http", "port")
+	if err != nil {
+		port = 9000
+	}
+	address := fmt.Sprintf("127.0.0.1:%d",port)
+	server := &http.Server{Addr: address, Handler: &mqttServerMux}
 	server.ListenAndServe()
 
 }
