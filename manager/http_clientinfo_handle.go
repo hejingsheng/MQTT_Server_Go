@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mqtt_server/MQTT_Server_Go/process"
-	_"github.com/mqtt_server/MQTT_Server_Go/process"
 	"net/http"
+	"strconv"
 )
 
 func GetClientInfoList(start int, limit int) []ClientInfo {
-	var data []ClientInfo = make([]ClientInfo, limit)
+	var data []ClientInfo = make([]ClientInfo, 0)
 	var index int = 0
 	for _, client := range process.GloablClientsMap {
 		if index >= start && index < start+limit {
@@ -19,7 +19,7 @@ func GetClientInfoList(start int, limit int) []ClientInfo {
 			tmp.Username = client.Username
 			tmp.SubTopicNum = len(client.SubInfo)
 			tmp.OfflineNum = len(client.OfflineMsg)
-			data[index-start] = tmp
+			data = append(data, tmp)
 		}
 		index++
 	}
@@ -40,7 +40,17 @@ type ClientInfoListHandle struct {
 
 func (list *ClientInfoListHandle)ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	list.ClientInfoList = GetClientInfoList(0, 10)
+	arg1 := r.URL.Query().Get("start")
+	arg2 := r.URL.Query().Get("limit")
+	start, err := strconv.Atoi(arg1)
+	if err != nil {
+		return
+	}
+	limit, err := strconv.Atoi(arg2)
+	if err != nil {
+		return
+	}
+	list.ClientInfoList = GetClientInfoList(start, limit)
 	jsonResp, err := json.Marshal(list)
 	if err != nil {
 		fmt.Println(err)
