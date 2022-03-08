@@ -51,17 +51,22 @@
 		function registerNum(start, limit) {
 			getClientList(start, limit, result_cb)
 		}
-
+        function clientSub(clientId, start, limit) {
+            getClientSub(clientId, start, limit, result_cb)
+        }
+        function clientOffline(clientId) {
+            getClientOfflineMsg(clientId, result_cb)
+        }
 	</script>
 </head>
 <body>
 
 <div id='header'>
 	<ul id="menu">
-        <li><a href="javascript:onlineNum()">在线人数</a></li>
+         <li><a href="javascript:onlineNum()">在线人数</a></li>
          <li><a href="javascript:registerNum(0,5)">注册人数</a></li>
-         <li><a href="javascript:onlineNum()">test1</a></li>
-         <li><a href="javascript:onlineNum()" class="last">test2</a></li>
+         <li><a href="javascript:clientSub('mqttx_48ff628a',0,5)">订阅主题</a></li>
+         <li><a href="javascript:clientOffline('mqttx_48ff628a')" class="last">离线消息</a></li>
     </ul>
 </div>
 <br/>

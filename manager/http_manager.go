@@ -22,7 +22,7 @@ func Http_Manager_Server() {
 	if err != nil {
 		port = 9000
 	}
-	address := fmt.Sprintf("127.0.0.1:%d",port)
+	address := fmt.Sprintf("0.0.0.0:%d",port)
 	server := &http.Server{Addr: address, Handler: &mqttServerMux}
 	server.ListenAndServe()
 
