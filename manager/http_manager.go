@@ -2,7 +2,7 @@ package manager
 
 import (
 	"fmt"
-	"github.com/mqtt_server/MQTT_Server_Go/config"
+	"mqtt_server/MQTT_Server_Go/config"
 	"net/http"
 )
 

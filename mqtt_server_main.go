@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/mqtt_server/MQTT_Server_Go/config"
-	"github.com/mqtt_server/MQTT_Server_Go/log"
-	"github.com/mqtt_server/MQTT_Server_Go/manager"
-	"github.com/mqtt_server/MQTT_Server_Go/process"
+	"mqtt_server/MQTT_Server_Go/config"
+	"mqtt_server/MQTT_Server_Go/log"
+	"mqtt_server/MQTT_Server_Go/manager"
+	"mqtt_server/MQTT_Server_Go/process"
 	"net"
 )
 

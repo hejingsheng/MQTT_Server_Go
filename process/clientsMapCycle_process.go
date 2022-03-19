@@ -1,7 +1,7 @@
 package process
 
 import (
-	"github.com/mqtt_server/MQTT_Server_Go/log"
+	"mqtt_server/MQTT_Server_Go/log"
 	"time"
 )
 

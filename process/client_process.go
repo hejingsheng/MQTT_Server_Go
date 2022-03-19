@@ -1,9 +1,9 @@
 package process
 
 import (
-	"github.com/mqtt_server/MQTT_Server_Go/log"
-	"github.com/mqtt_server/MQTT_Server_Go/protocol_stack"
-	"github.com/mqtt_server/MQTT_Server_Go/utils"
+	"mqtt_server/MQTT_Server_Go/log"
+	"mqtt_server/MQTT_Server_Go/protocol_stack"
+	"mqtt_server/MQTT_Server_Go/utils"
 	"net"
 	"sync"
 )

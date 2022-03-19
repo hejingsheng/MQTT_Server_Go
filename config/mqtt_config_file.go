@@ -1,6 +1,6 @@
 package config
 
-import "github.com/go_config/goconfig"
+import "github.com/Unknwon/goconfig"
 
 var cfg *goconfig.ConfigFile
 

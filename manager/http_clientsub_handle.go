@@ -3,7 +3,7 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mqtt_server/MQTT_Server_Go/process"
+	"mqtt_server/MQTT_Server_Go/process"
 	"net/http"
 	"strconv"
 )
