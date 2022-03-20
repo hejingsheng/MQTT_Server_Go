@@ -44,4 +44,9 @@ func RemoveRoutinId(id string) {
 	}
 }
 
+func GeneralPacketID() uint16 {
+	id := uint16(generalRandNum()&0x0000ffff)
+	return id
+}
+
 
