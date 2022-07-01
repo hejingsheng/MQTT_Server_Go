@@ -1,7 +1,11 @@
 package utils
 
 import (
+	"math/big"
 	"math/rand"
+	"net"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -47,6 +51,24 @@ func RemoveRoutinId(id string) {
 func GeneralPacketID() uint16 {
 	id := uint16(generalRandNum()&0x0000ffff)
 	return id
+}
+
+func Addr2Int(addr string) int64 {
+	index := strings.Index(addr, ":")
+	ip := addr[0:index]
+	port, _ := strconv.Atoi(addr[index+1 : len(addr)])
+	ret := big.NewInt(0)
+	ret.SetBytes(net.ParseIP(ip).To4())
+	data := ret.Int64()
+	data <<= 16
+	data |= int64(port)
+	return data
+}
+
+func IpStr2Uint32(ip string) uint32 {
+	ret := big.NewInt(0)
+	ret.SetBytes(net.ParseIP(ip).To4())
+	return uint32(ret.Int64())
 }
 
 
