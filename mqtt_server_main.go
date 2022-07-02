@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"mqtt_server/MQTT_Server_Go/cluster_server"
+	"mqtt_server/MQTT_Server_Go/cluster"
 	"mqtt_server/MQTT_Server_Go/config"
 	"mqtt_server/MQTT_Server_Go/log"
 	"mqtt_server/MQTT_Server_Go/manager"
@@ -45,7 +45,7 @@ func main() {
 	cycleChannal := make(chan process.CycleRoutinMsg)
 	go process.ClientsMapCycle(cycleChannal)
 	go manager.Http_Manager_Server()
-	cluster_server.StartClusterServerNode()
+	cluster.StartClusterServerNode()
 
 	for {
 		log.LogPrint(log.LOG_INFO, "[%s] wait a client connect", mainThreadId)
