@@ -11,12 +11,14 @@ import (
 )
 
 const (
-	TIME_1_SECOND = 100
-	TIME_1_MINUTE = 100 * 60
+	TIME_1_SECOND = 10
+	TIME_1_MINUTE = 10 * 60
 )
 
 const (
 	CLUSTER_HEART_MSG = 0x0001
+	CLUSTER_PUBLIC_MSG = 0x0002
+	CLUSTER_LOGIN_MSG = 0x0003
 )
 
 type ClusterRoutingMsg struct {
@@ -50,6 +52,7 @@ func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan C
 		remoteAddr = *addr
 		msg.MsgBody = remoteAddr
 		ch <- msg
+	case CLUSTER_PUBLIC_MSG:
 	}
 }
 
@@ -106,6 +109,7 @@ func startClusterServerCycly(conn *net.UDPConn, ch chan ClusterRoutingMsg) {
 				if ok {
 					for _, serverNode := range clusterServerNodes {
 						if serverNode.Ip == raddr.IP.To4().String() && serverNode.Port == uint16(raddr.Port) {
+							log.LogPrint(log.LOG_INFO, "update [%s:%d] cluster server node", serverNode.Ip, serverNode.Port)
 							serverNode.UpdateKeepAliveTimeout()
 							break
 						}
