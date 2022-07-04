@@ -9,11 +9,13 @@ import (
 
 func GetOnLineClientNum() int {
 	var num int = 0
+	process.GlobalClientsMapLock.RLock()
 	for _, client := range process.GloablClientsMap {
 		if client.LoginSuccess == 1 {
 			num++
 		}
 	}
+	process.GlobalClientsMapLock.RUnlock()
 	return num
 }
 

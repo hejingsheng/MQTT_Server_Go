@@ -8,10 +8,13 @@ import (
 )
 
 func GetClientOffLineMsgList(clientId string) int  {
+	process.GlobalClientsMapLock.RLock()
 	client, ok := process.GloablClientsMap[clientId]
 	if ok {
+		process.GlobalClientsMapLock.RUnlock()
 		return len(client.OfflineMsg)
 	} else {
+		process.GlobalClientsMapLock.RUnlock()
 		return 0
 	}
 }

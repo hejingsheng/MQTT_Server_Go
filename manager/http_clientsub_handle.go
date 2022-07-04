@@ -9,11 +9,23 @@ import (
 )
 
 func GetClientSubList(clientId string, start int, limit int) []SubInfo  {
+	process.GlobalClientsMapLock.RLock()
 	client, ok := process.GloablClientsMap[clientId]
 	if ok {
 		var data []SubInfo = make([]SubInfo, 0)
 		var index int = 0
-		for topic, qos := range client.SubInfo {
+		//for topic, qos := range client.SubInfo {
+		//	if index >= start && index < start+limit {
+		//		var tmp SubInfo
+		//		tmp.Topic = topic
+		//		tmp.Qos = qos
+		//		data = append(data, tmp)
+		//	}
+		//	index++
+		//}
+		client.SubInfo.Range(func(key, value interface{}) bool {
+			topic := key.(string)
+			qos := value.(uint8)
 			if index >= start && index < start+limit {
 				var tmp SubInfo
 				tmp.Topic = topic
@@ -21,9 +33,12 @@ func GetClientSubList(clientId string, start int, limit int) []SubInfo  {
 				data = append(data, tmp)
 			}
 			index++
-		}
+			return true
+		})
+		process.GlobalClientsMapLock.RUnlock()
 		return data
 	} else {
+		process.GlobalClientsMapLock.RUnlock()
 		return nil
 	}
 }

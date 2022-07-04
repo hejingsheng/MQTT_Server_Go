@@ -59,13 +59,13 @@ func (unsubData *MQTTPacketUnSubscribeData) MQTTSeserialize_unsuback(buf *[]byte
 	return index
 }
 
-func (unsubData *MQTTPacketUnSubscribeData) MQTTRemoveUnSubTopic(subInfo sync.Map) {
+func (unsubData *MQTTPacketUnSubscribeData) MQTTRemoveUnSubTopic(subInfo *sync.Map) {
 	for _, topic := range unsubData.Topic {
 		//_, ok := subInfo[topic]
-		_, ok := subInfo.Load(topic)
+		_, ok := (*subInfo).Load(topic)
 		if ok {
 			//delete(subInfo, topic)
-			subInfo.Delete(topic)
+			(*subInfo).Delete(topic)
 		}
 	}
 }

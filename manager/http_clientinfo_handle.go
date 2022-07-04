@@ -11,18 +11,26 @@ import (
 func GetClientInfoList(start int, limit int) []ClientInfo {
 	var data []ClientInfo = make([]ClientInfo, 0)
 	var index int = 0
+	var length int = 0
+	process.GlobalClientsMapLock.RLock()
 	for _, client := range process.GloablClientsMap {
 		if index >= start && index < start+limit {
 			var tmp ClientInfo
 			tmp.ClientId = client.ClientId
 			tmp.LoginSuccess = client.LoginSuccess
 			tmp.Username = client.Username
-			tmp.SubTopicNum = len(client.SubInfo)
+			//tmp.SubTopicNum = len(client.SubInfo)
+			client.SubInfo.Range(func(key, value interface{}) bool {
+				length++
+				return true
+			})
+			tmp.SubTopicNum = length
 			tmp.OfflineNum = len(client.OfflineMsg)
 			data = append(data, tmp)
 		}
 		index++
 	}
+	process.GlobalClientsMapLock.RUnlock()
 	return data
 }
 
