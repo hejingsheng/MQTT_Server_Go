@@ -19,11 +19,7 @@ func GetClientInfoList(start int, limit int) []ClientInfo {
 			tmp.ClientId = client.ClientId
 			tmp.LoginSuccess = client.LoginSuccess
 			tmp.Username = client.Username
-			//tmp.SubTopicNum = len(client.SubInfo)
-			client.SubInfo.Range(func(key, value interface{}) bool {
-				length++
-				return true
-			})
+			tmp.SubTopicNum = len(client.SubInfo)
 			tmp.SubTopicNum = length
 			tmp.OfflineNum = len(client.OfflineMsg)
 			data = append(data, tmp)

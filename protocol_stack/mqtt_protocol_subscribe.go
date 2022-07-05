@@ -70,8 +70,8 @@ func (subdata *MQTTPacketSubscribeData) MQTTSeserialize_suback(buf *[]byte, num 
 	return index
 }
 
-func (subdata *MQTTPacketSubscribeData) MQTTGetSubInfo(subInfo map[string]uint8, topicNum int) {
-	for i := 0; i < topicNum; i++ {
+func (subdata *MQTTPacketSubscribeData) MQTTGetSubInfo(subInfo map[string]uint8) {
+	for i := 0; i < len(subdata.Topic); i++ {
 		subInfo[subdata.Topic[i]] = subdata.Qos[i]
 	}
 }
