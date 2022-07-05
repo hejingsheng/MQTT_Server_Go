@@ -41,8 +41,8 @@ func main() {
 	}
 	defer listen.Close()
 
-	cycleChannal := make(chan process.CycleRoutinMsg)
-	go process.ClientsMapCycle(cycleChannal)
+	dispatchChannal := make(chan process.DispatchRoutinMsg)
+	go process.ClientsMsgDispatch(dispatchChannal)
 	go manager.Http_Manager_Server()
 	//cluster.StartClusterServerNode()
 
@@ -53,7 +53,7 @@ func main() {
 			log.LogPrint(log.LOG_ERROR, "[%s] client connect error", mainThreadId)
 		} else {
 			log.LogPrint(log.LOG_INFO, "[%s] a client connect success %v", mainThreadId, conn.RemoteAddr().String())
-			go process.ClientProcess(conn, cycleChannal)
+			go process.ClientProcess(conn, dispatchChannal)
 		}
 
 	}

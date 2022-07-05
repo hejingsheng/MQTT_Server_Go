@@ -18,13 +18,13 @@ const (
 	MSG_CLIENT_PUBCOMP
 )
 
-type CycleRoutinMsg struct {
+type DispatchRoutinMsg struct {
 	MsgType uint16
 	MsgFrom string
 	MsgBody interface{}
 }
 
-func processMsg(routinId string, msg CycleRoutinMsg) {
+func processMsg(routinId string, msg DispatchRoutinMsg) {
 	switch msg.MsgType {
 	case MSG_CLIENT_ADD:
 		mqttClient,ok := msg.MsgBody.(*MqttClientInfo)
@@ -193,7 +193,7 @@ func processMsg(routinId string, msg CycleRoutinMsg) {
 	}
 }
 
-func ClientsMapCycle(cycle chan CycleRoutinMsg) {
+func ClientsMsgDispatch(cycle chan DispatchRoutinMsg) {
 
 	var routinId string = "Dispatch"
 
@@ -202,7 +202,7 @@ func ClientsMapCycle(cycle chan CycleRoutinMsg) {
 	ticker := time.NewTicker(time.Second * 1)
 
 	for {
-		var data CycleRoutinMsg
+		var data DispatchRoutinMsg
 		select {
 		case <- ticker.C:
 			for _, client := range GloablClientsMap {

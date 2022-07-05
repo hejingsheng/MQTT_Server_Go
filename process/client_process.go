@@ -38,7 +38,7 @@ func (mqttClientData *MqttClientInfo) GeneralUniquePacketId() uint16 {
 	}
 }
 
-func (mqttClientData *MqttClientInfo) ProcessSubscribe(routinId string, read_buf []byte, num int, cycleCh chan CycleRoutinMsg) int {
+func (mqttClientData *MqttClientInfo) ProcessSubscribe(routinId string, read_buf []byte, num int, cycleCh chan DispatchRoutinMsg) int {
 	if mqttClientData.LoginSuccess != 1 {
 		log.LogPrint(log.LOG_ERROR, "[%s] client not login", routinId)
 		return -1
@@ -46,7 +46,7 @@ func (mqttClientData *MqttClientInfo) ProcessSubscribe(routinId string, read_buf
 		var subscribeData protocol_stack.MQTTPacketSubscribeData
 		topicNum := subscribeData.MQTTDeserialize_subscribe(read_buf, num)
 		log.LogPrint(log.LOG_INFO, "[%s] client [%s] subscribe %d topic", routinId, mqttClientData.ClientId, topicNum)
-		var msg_ch CycleRoutinMsg
+		var msg_ch DispatchRoutinMsg
 		msg_ch.MsgType = MSG_CLIENT_SUB
 		msg_ch.MsgFrom = mqttClientData.ClientId
 		msg_ch.MsgBody = subscribeData
@@ -58,14 +58,14 @@ func (mqttClientData *MqttClientInfo) ProcessSubscribe(routinId string, read_buf
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo) ProcessUnSubscribe(routinId string, read_buf []byte, num int, cycleCh chan CycleRoutinMsg) int {
+func (mqttClientData *MqttClientInfo) ProcessUnSubscribe(routinId string, read_buf []byte, num int, cycleCh chan DispatchRoutinMsg) int {
 	if mqttClientData.LoginSuccess != 1 {
 		log.LogPrint(log.LOG_ERROR, "[%s] client not login", routinId)
 	} else {
 		var unSubscribeData protocol_stack.MQTTPacketUnSubscribeData
 		topicNum := unSubscribeData.MQTTDeserialize_unsubscribe(read_buf, num)
 		log.LogPrint(log.LOG_INFO, "[%s] client [%s] unsubscribe %d topic", routinId, mqttClientData.ClientId, topicNum)
-		var msg_ch CycleRoutinMsg
+		var msg_ch DispatchRoutinMsg
 		msg_ch.MsgType = MSG_CLIENT_UNSUB
 		msg_ch.MsgFrom = mqttClientData.ClientId
 		msg_ch.MsgBody = unSubscribeData
@@ -77,7 +77,7 @@ func (mqttClientData *MqttClientInfo) ProcessUnSubscribe(routinId string, read_b
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo) ProcessPublish(routinId string, read_buf []byte, num int, cycleCh chan CycleRoutinMsg) int {
+func (mqttClientData *MqttClientInfo) ProcessPublish(routinId string, read_buf []byte, num int, cycleCh chan DispatchRoutinMsg) int {
 	if mqttClientData.LoginSuccess != 1 {
 		log.LogPrint(log.LOG_ERROR, "[%s] client not login", routinId)
 	} else {
@@ -99,7 +99,7 @@ func (mqttClientData *MqttClientInfo) ProcessPublish(routinId string, read_buf [
 		}
 		// dispatch msg need Regenerate packet id for qos1 and qos2 because different client maybe generate same packet id
 		// so we need generate packet id by server to provice different packet id for each client
-		var msg_ch CycleRoutinMsg
+		var msg_ch DispatchRoutinMsg
 		msg_ch.MsgType = MSG_CLIENT_PUBLISH
 		msg_ch.MsgFrom = mqttClientData.ClientId
 		msg_ch.MsgBody = publishData
@@ -111,10 +111,10 @@ func (mqttClientData *MqttClientInfo) ProcessPublish(routinId string, read_buf [
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo) ProcessPublishAck(routinId string, read_buf []byte, num int, cycleCh chan CycleRoutinMsg) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishAck(routinId string, read_buf []byte, num int, cycleCh chan DispatchRoutinMsg) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_puback(read_buf, num)
-	var msg_ch CycleRoutinMsg
+	var msg_ch DispatchRoutinMsg
 	msg_ch.MsgType = MSG_CLIENT_PUBACK
 	msg_ch.MsgFrom = mqttClientData.ClientId
 	msg_ch.MsgBody = publishData
@@ -122,10 +122,10 @@ func (mqttClientData *MqttClientInfo) ProcessPublishAck(routinId string, read_bu
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo) ProcessPublishRec(routinId string, read_buf []byte, num int, cycleCh chan CycleRoutinMsg) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishRec(routinId string, read_buf []byte, num int, cycleCh chan DispatchRoutinMsg) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_pubrec(read_buf, num)
-	var msg_ch CycleRoutinMsg
+	var msg_ch DispatchRoutinMsg
 	msg_ch.MsgType = MSG_CLIENT_PUBREC
 	msg_ch.MsgFrom = mqttClientData.ClientId
 	msg_ch.MsgBody = publishData
@@ -133,20 +133,20 @@ func (mqttClientData *MqttClientInfo) ProcessPublishRec(routinId string, read_bu
 	return 0
 }
 
-func (mqttClientData *MqttClientInfo) ProcessPublishRel(routinId string, read_buf []byte, num int, cycleCh chan CycleRoutinMsg) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishRel(routinId string, read_buf []byte, num int, cycleCh chan DispatchRoutinMsg) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_pubrel(read_buf, num)
-	var msg_ch CycleRoutinMsg
+	var msg_ch DispatchRoutinMsg
 	msg_ch.MsgType = MSG_CLIENT_PUBREL
 	msg_ch.MsgFrom = mqttClientData.ClientId
 	msg_ch.MsgBody = publishData
 	cycleCh <- msg_ch
 	return 0
 }
-func (mqttClientData *MqttClientInfo) ProcessPublishComp(routinId string, read_buf []byte, num int, cycleCh chan CycleRoutinMsg) int {
+func (mqttClientData *MqttClientInfo) ProcessPublishComp(routinId string, read_buf []byte, num int, cycleCh chan DispatchRoutinMsg) int {
 	var publishData protocol_stack.MQTTPacketPublishData
 	publishData.MQTTDeserialize_pubcomp(read_buf, num)
-	var msg_ch CycleRoutinMsg
+	var msg_ch DispatchRoutinMsg
 	msg_ch.MsgType = MSG_CLIENT_PUBCOMP
 	msg_ch.MsgFrom = mqttClientData.ClientId
 	msg_ch.MsgBody = publishData
@@ -164,7 +164,7 @@ func init() {
 	GloablClientsMap = make(map[string]*MqttClientInfo, 1)
 }
 
-func ClientProcess(localconn net.Conn, cycleCh chan CycleRoutinMsg) {
+func ClientProcess(localconn net.Conn, dispatchCh chan DispatchRoutinMsg) {
 
 	var routinId string // use client struct address as thread id
 	var mqttClientData *MqttClientInfo = nil
@@ -187,10 +187,10 @@ func ClientProcess(localconn net.Conn, cycleCh chan CycleRoutinMsg) {
 			//globalClientsMapLock.Lock()
 			//delete(gloablClientsMap, mqttClientData.clientId)
 			//globalClientsMapLock.Unlock()
-			var msg CycleRoutinMsg
+			var msg DispatchRoutinMsg
 			msg.MsgType = MSG_CLIENT_DEL
 			msg.MsgBody = mqttClientData.ClientId
-			cycleCh <- msg
+			dispatchCh <- msg
 		} else {
 			mqttClientData.LoginSuccess = 0
 		}
@@ -254,10 +254,10 @@ func ClientProcess(localconn net.Conn, cycleCh chan CycleRoutinMsg) {
 						}
 						mqttClientData.OfflineMsg = []protocol_stack.MQTTPacketPublishData{}
 						GlobalClientsMapLock.RUnlock()
-						var msg CycleRoutinMsg
+						var msg DispatchRoutinMsg
 						msg.MsgType = MSG_CLIENT_ADD
 						msg.MsgBody = mqttClientData
-						cycleCh <- msg
+						dispatchCh <- msg
 					} else {
 						localconn.Write(write_buf)
 						localconn.Close()
@@ -266,19 +266,19 @@ func ClientProcess(localconn net.Conn, cycleCh chan CycleRoutinMsg) {
 					log.LogPrint(log.LOG_INFO, "[%s] client [%s] send disconnect req", routinId, mqttClientData.ClientId)
 					localconn.Close()
 				case protocol_stack.SUBSCRIBE:
-					mqttClientData.ProcessSubscribe(routinId, read_buf, num, cycleCh)
+					mqttClientData.ProcessSubscribe(routinId, read_buf, num, dispatchCh)
 				case protocol_stack.UNSUBSCRIBE:
-					mqttClientData.ProcessUnSubscribe(routinId, read_buf, num, cycleCh)
+					mqttClientData.ProcessUnSubscribe(routinId, read_buf, num, dispatchCh)
 				case protocol_stack.PUBLISH:
-					mqttClientData.ProcessPublish(routinId, read_buf, num, cycleCh)
+					mqttClientData.ProcessPublish(routinId, read_buf, num, dispatchCh)
 				case protocol_stack.PUBACK:
-					mqttClientData.ProcessPublishAck(routinId, read_buf, num, cycleCh)
+					mqttClientData.ProcessPublishAck(routinId, read_buf, num, dispatchCh)
 				case protocol_stack.PUBREC:
-					mqttClientData.ProcessPublishRec(routinId, read_buf, num, cycleCh)
+					mqttClientData.ProcessPublishRec(routinId, read_buf, num, dispatchCh)
 				case protocol_stack.PUBREL:
-					mqttClientData.ProcessPublishRel(routinId, read_buf, num, cycleCh)
+					mqttClientData.ProcessPublishRel(routinId, read_buf, num, dispatchCh)
 				case protocol_stack.PUBCOMP:
-					mqttClientData.ProcessPublishComp(routinId, read_buf, num, cycleCh)
+					mqttClientData.ProcessPublishComp(routinId, read_buf, num, dispatchCh)
 				case protocol_stack.PINGREQ:
 					mqttClientData.heartTimeout = mqttClientData.pingperiod
 					var pingpongdata protocol_stack.MQTTPacketPingPongData
