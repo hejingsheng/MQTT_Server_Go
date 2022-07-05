@@ -1,7 +1,5 @@
 package protocol_stack
 
-import "sync"
-
 type MQTTPacketUnSubscribeData struct {
 	Topic    []string
 	PacketId uint16
@@ -59,13 +57,11 @@ func (unsubData *MQTTPacketUnSubscribeData) MQTTSeserialize_unsuback(buf *[]byte
 	return index
 }
 
-func (unsubData *MQTTPacketUnSubscribeData) MQTTRemoveUnSubTopic(subInfo *sync.Map) {
+func (unsubData *MQTTPacketUnSubscribeData) MQTTRemoveUnSubTopic(subInfo map[string]uint8) {
 	for _, topic := range unsubData.Topic {
-		//_, ok := subInfo[topic]
-		_, ok := (*subInfo).Load(topic)
+		_, ok := subInfo[topic]
 		if ok {
-			//delete(subInfo, topic)
-			(*subInfo).Delete(topic)
+			delete(subInfo, topic)
 		}
 	}
 }
