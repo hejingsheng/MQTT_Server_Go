@@ -1,6 +1,7 @@
 package process
 
 import (
+	"mqtt_server/MQTT_Server_Go/cluster"
 	"mqtt_server/MQTT_Server_Go/log"
 	"mqtt_server/MQTT_Server_Go/protocol_stack"
 	"mqtt_server/MQTT_Server_Go/utils"
@@ -92,7 +93,7 @@ func (mqttClientData *MqttClientInfo) ProcessPublish(routinId string, read_buf [
 			publishData.MQTTSeserialize_puback(&write_buf_ack)
 		} else if publishData.Qos == 2 {
 			// server recv qos2 msg send pubrec msg wait client send pubrel
-			log.LogPrint(log.LOG_DEBUG, "[%s] client [%s] send pubrec pid %d", routinId, mqttClientData.ClientId, publishData.PacketId)
+			log.LogPrint(log.LOG_DEBUG, "[%s] client [%s] recv publish msg pid %d", routinId, mqttClientData.ClientId, publishData.PacketId)
 			publishData.MQTTSeserialize_pubrec(&write_buf_ack)
 		} else {
 			// Qos = 0
@@ -106,6 +107,13 @@ func (mqttClientData *MqttClientInfo) ProcessPublish(routinId string, read_buf [
 		cycleCh <- msg_ch
 		if len(write_buf_ack) > 0 {
 			mqttClientData.conn.Write(write_buf_ack)
+		}
+		if publishData.Qos < 2 {
+			log.LogPrint(log.LOG_INFO, "[%s] client [%s] recv publish msg(qos<2) complete send to cluster server node", routinId, mqttClientData.ClientId)
+			var msg_cluster cluster.ClusterRoutingMsg
+			msg_cluster.MsgType = cluster.CLUSTER_PUBLIC_MSG
+			msg_cluster.MsgBody = publishData
+			cluster.Cluster_Ch <- msg_cluster
 		}
 	}
 	return 0

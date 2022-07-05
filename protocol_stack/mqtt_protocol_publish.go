@@ -8,12 +8,12 @@ package protocol_stack
 //}
 
 type MQTTPacketPublishData struct {
-	Dup uint8
-	PacketId uint16
-	Retained uint8
-	Topic string
-	Qos uint8
-	Payload string
+	Dup uint8        `json:"dup"`
+	PacketId uint16  `json:"packetid"`
+	Retained uint8   `json:"retained"`
+	Topic string     `json:"topic"`
+	Qos uint8        `json:"qos"`
+	Payload string   `json:"payload"`
 }
 
 func (publishData *MQTTPacketPublishData)MQTTDeserialize_publish(buf []byte, len int) int {

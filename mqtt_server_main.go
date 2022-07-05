@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"mqtt_server/MQTT_Server_Go/cluster"
 	"mqtt_server/MQTT_Server_Go/config"
 	"mqtt_server/MQTT_Server_Go/log"
 	"mqtt_server/MQTT_Server_Go/manager"
@@ -44,7 +45,7 @@ func main() {
 	dispatchChannal := make(chan process.DispatchRoutinMsg)
 	go process.ClientsMsgDispatch(dispatchChannal)
 	go manager.Http_Manager_Server()
-	//cluster.StartClusterServerNode()
+	cluster.StartClusterServerNode(dispatchChannal)
 
 	for {
 		log.LogPrint(log.LOG_INFO, "[%s] wait a client connect", mainThreadId)

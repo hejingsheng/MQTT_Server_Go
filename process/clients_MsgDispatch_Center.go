@@ -1,6 +1,7 @@
 package process
 
 import (
+	"mqtt_server/MQTT_Server_Go/cluster"
 	"mqtt_server/MQTT_Server_Go/log"
 	"mqtt_server/MQTT_Server_Go/protocol_stack"
 	"time"
@@ -16,6 +17,8 @@ const (
 	MSG_CLIENT_PUBREC
 	MSG_CLIENT_PUBREL
 	MSG_CLIENT_PUBCOMP
+
+	MSG_CLUSTER_PUBLISH
 )
 
 type DispatchRoutinMsg struct {
@@ -168,6 +171,11 @@ func processMsg(routinId string, msg DispatchRoutinMsg) {
 							}
 						}
 					}
+					log.LogPrint(log.LOG_INFO, "[%s] client [%s] send pubrel for pid %d msg(qos=2) complete send to cluster server node", routinId, from, publishData.PacketId)
+					var msg_cluster cluster.ClusterRoutingMsg
+					msg_cluster.MsgType = cluster.CLUSTER_PUBLIC_MSG
+					msg_cluster.MsgBody = publishData
+					cluster.Cluster_Ch <- msg_cluster
 				} else {
 					log.LogPrint(log.LOG_WARNING, "[%s] not find client msg", routinId)
 				}
@@ -188,12 +196,47 @@ func processMsg(routinId string, msg DispatchRoutinMsg) {
 		} else {
 			log.LogPrint(log.LOG_WARNING, "[%s] not find client or client status error, drop it", routinId)
 		}
+	case MSG_CLUSTER_PUBLISH:
+		publishData := msg.MsgBody.(protocol_stack.MQTTPacketPublishData)
+		from := msg.MsgFrom
+		log.LogPrint(log.LOG_INFO, "[%s] recv from cluster server node [%s] pub msg topic %s qos %d", routinId, from, publishData.Topic, publishData.Qos)
+		for _, client := range GloablClientsMap {
+			for topic := range client.SubInfo {
+				if topic == publishData.Topic {
+					publishData.PacketId = client.GeneralUniquePacketId()
+					log.LogPrint(log.LOG_DEBUG, "[%s] client[%s]->client[%s] send pid %d qos2 msg", routinId, from, client.ClientId, publishData.PacketId)
+					if client.LoginSuccess == 1 {
+						write_buf := []byte{}
+						if publishData.Qos == 0 {
+							publishData.MQTTSeserialize_publish(&write_buf)
+							client.conn.Write(write_buf)
+						} else if publishData.Qos == 1 {
+							publishData.MQTTSeserialize_publish(&write_buf)
+							client.PubStatus[publishData.PacketId] = protocol_stack.PUBACK
+							client.conn.Write(write_buf)
+						} else if publishData.Qos == 2 {
+							publishData.MQTTSeserialize_publish(&write_buf)
+							client.CacheMsg[publishData.PacketId] = publishData
+							client.PubStatus[publishData.PacketId] = protocol_stack.PUBREC
+							client.conn.Write(write_buf)
+						} else {
+							log.LogPrint(log.LOG_ERROR, "[%s] from [%s] cluster node error msg qos")
+						}
+					} else {
+						if publishData.Qos >= 1 {
+							log.LogPrint(log.LOG_INFO, "[%s] from [%s] msg qos %d complete but client [%s] offline need save offline", routinId, from, publishData.Qos, client.ClientId)
+							client.OfflineMsg = append(client.OfflineMsg, publishData)
+						}
+					}
+				}
+			}
+		}
 	default:
 		log.LogPrint(log.LOG_WARNING, "[%s] not support this msg type", routinId)
 	}
 }
 
-func ClientsMsgDispatch(cycle chan DispatchRoutinMsg) {
+func ClientsMsgDispatch(dispatchCh chan DispatchRoutinMsg) {
 
 	var routinId string = "Dispatch"
 
@@ -212,7 +255,7 @@ func ClientsMsgDispatch(cycle chan DispatchRoutinMsg) {
 					client.conn.Close()
 				}
 			}
-		case data = <- cycle:
+		case data = <- dispatchCh:
 			GlobalClientsMapLock.Lock()
 			processMsg(routinId, data)
 			GlobalClientsMapLock.Unlock()
