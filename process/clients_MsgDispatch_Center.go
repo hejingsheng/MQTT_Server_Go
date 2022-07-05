@@ -18,16 +18,16 @@ const (
 	MSG_CLIENT_PUBREL
 	MSG_CLIENT_PUBCOMP
 
-	MSG_CLUSTER_PUBLISH
+	MSG_CLUSTER_PUBLISH = 100
 )
 
-type DispatchRoutinMsg struct {
-	MsgType uint16
-	MsgFrom string
-	MsgBody interface{}
-}
+//type DispatchRoutinMsg struct {
+//	MsgType uint16
+//	MsgFrom string
+//	MsgBody interface{}
+//}
 
-func processMsg(routinId string, msg DispatchRoutinMsg) {
+func processMsg(routinId string, msg cluster.RoutingCommunicateMsg) {
 	switch msg.MsgType {
 	case MSG_CLIENT_ADD:
 		mqttClient,ok := msg.MsgBody.(*MqttClientInfo)
@@ -172,9 +172,9 @@ func processMsg(routinId string, msg DispatchRoutinMsg) {
 						}
 					}
 					log.LogPrint(log.LOG_INFO, "[%s] client [%s] send pubrel for pid %d msg(qos=2) complete send to cluster server node", routinId, from, publishData.PacketId)
-					var msg_cluster cluster.ClusterRoutingMsg
+					var msg_cluster cluster.RoutingCommunicateMsg
 					msg_cluster.MsgType = cluster.CLUSTER_PUBLIC_MSG
-					msg_cluster.MsgBody = publishData
+					msg_cluster.MsgBody = pub_rel_msg
 					cluster.Cluster_Ch <- msg_cluster
 				} else {
 					log.LogPrint(log.LOG_WARNING, "[%s] not find client msg", routinId)
@@ -236,7 +236,7 @@ func processMsg(routinId string, msg DispatchRoutinMsg) {
 	}
 }
 
-func ClientsMsgDispatch(dispatchCh chan DispatchRoutinMsg) {
+func ClientsMsgDispatch(dispatchCh chan cluster.RoutingCommunicateMsg) {
 
 	var routinId string = "Dispatch"
 
@@ -245,7 +245,7 @@ func ClientsMsgDispatch(dispatchCh chan DispatchRoutinMsg) {
 	ticker := time.NewTicker(time.Second * 1)
 
 	for {
-		var data DispatchRoutinMsg
+		var data cluster.RoutingCommunicateMsg
 		select {
 		case <- ticker.C:
 			for _, client := range GloablClientsMap {

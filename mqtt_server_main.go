@@ -11,7 +11,7 @@ import (
 	"net"
 )
 
-var SOFTWARE_VERSION string = "V0.0.1"
+var SOFTWARE_VERSION string = "V0.1.1"
 var SOFTWARE_AUTHOR  string = "Jack He"
 
 var c = flag.String("c", "", "Config File Path")
@@ -42,7 +42,7 @@ func main() {
 	}
 	defer listen.Close()
 
-	dispatchChannal := make(chan process.DispatchRoutinMsg)
+	dispatchChannal := make(chan cluster.RoutingCommunicateMsg)
 	go process.ClientsMsgDispatch(dispatchChannal)
 	go manager.Http_Manager_Server()
 	cluster.StartClusterServerNode(dispatchChannal)

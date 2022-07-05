@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"mqtt_server/MQTT_Server_Go/config"
 	"mqtt_server/MQTT_Server_Go/log"
-	"mqtt_server/MQTT_Server_Go/process"
 	"mqtt_server/MQTT_Server_Go/protocol_stack"
 	"net"
 	"strconv"
@@ -24,14 +23,15 @@ const (
 	CLUSTER_LOGIN_MSG = 0x0003
 )
 
-type ClusterRoutingMsg struct {
+type RoutingCommunicateMsg struct {
 	MsgType uint16
+	MsgFrom string
 	MsgBody interface{}
 }
 
 var (
 	clusterServerNodes []*ClusterNodeInfo
-	Cluster_Ch chan ClusterRoutingMsg
+	Cluster_Ch chan RoutingCommunicateMsg
 )
 
 func buildClusterHeartMsg() []byte {
@@ -50,30 +50,30 @@ func buildClusterPublishMsg(pubdata []byte) []byte {
 	return msg
 }
 
-func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan ClusterRoutingMsg, ch1 chan process.DispatchRoutinMsg) {
+func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan RoutingCommunicateMsg, ch1 chan RoutingCommunicateMsg) {
 	msgType := binary.BigEndian.Uint16(data[0:2])
 	msgLen := binary.BigEndian.Uint16(data[2:4])
-	if length < int(msgLen+4) {
+	if length != int(msgLen+4) {
 		log.LogPrint(log.LOG_WARNING, "recv data error %v", msgLen)
 		return
 	}
 	switch msgType {
 	case CLUSTER_HEART_MSG:
-		var msg ClusterRoutingMsg
+		var msg RoutingCommunicateMsg
 		var remoteAddr net.UDPAddr
 		msg.MsgType = CLUSTER_HEART_MSG
 		remoteAddr = *addr
 		msg.MsgBody = remoteAddr
 		ch <- msg
 	case CLUSTER_PUBLIC_MSG:
-		msgBody := data[4:]
+		msgBody := data[4:length]
 		var pubData protocol_stack.MQTTPacketPublishData
 		err := json.Unmarshal(msgBody, &pubData)
 		if err != nil {
 			log.LogPrint(log.LOG_ERROR, "public msg data error")
 		} else {
-			var dispatch_msg process.DispatchRoutinMsg
-			dispatch_msg.MsgType = process.MSG_CLUSTER_PUBLISH
+			var dispatch_msg RoutingCommunicateMsg
+			dispatch_msg.MsgType = 100
 			dispatch_msg.MsgBody = pubData
 			dispatch_msg.MsgFrom = addr.String()
 			ch1 <- dispatch_msg
@@ -81,7 +81,7 @@ func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan C
 	}
 }
 
-func startClusterServerRecv(conn *net.UDPConn, ch chan ClusterRoutingMsg, dispatchCh chan process.DispatchRoutinMsg) {
+func startClusterServerRecv(conn *net.UDPConn, ch chan RoutingCommunicateMsg, ch1 chan RoutingCommunicateMsg) {
 
 	defer conn.Close()
 
@@ -96,18 +96,18 @@ func startClusterServerRecv(conn *net.UDPConn, ch chan ClusterRoutingMsg, dispat
 		if n < 4 {
 			log.LogPrint(log.LOG_DEBUG, "data is invalid")
 		} else {
-			processClusterNodeMsg(data, n, raddr, ch, dispatchCh)
+			processClusterNodeMsg(data, n, raddr, ch, ch1)
 		}
 	}
 }
 
-func startClusterServerCycly(conn *net.UDPConn, ch chan ClusterRoutingMsg) {
+func startClusterServerCycly(conn *net.UDPConn, ch chan RoutingCommunicateMsg) {
 	timeEscape100MS := 0
 	timeEscape1S := 0
 	ticker := time.NewTicker(time.Millisecond * 100)
 
 	for {
-		var msg ClusterRoutingMsg
+		var msg RoutingCommunicateMsg
 		select {
 		case <-ticker.C:
 			timeEscape100MS++
@@ -172,7 +172,7 @@ func createClusterSocket(address string) (*net.UDPConn, error) {
 	return conn, nil
 }
 
-func StartClusterServerNode(dispatchCh chan process.DispatchRoutinMsg) int {
+func StartClusterServerNode(dispatch_ch chan RoutingCommunicateMsg) int {
 	ClusterPort, _ := config.ReadConfigValueInt("cluster", "port")
 	address := "0.0.0.0:" + strconv.Itoa(ClusterPort)
 	conn, err := createClusterSocket(address)
@@ -189,8 +189,8 @@ func StartClusterServerNode(dispatchCh chan process.DispatchRoutinMsg) int {
 		node := CreateClusterNode(nodeAddr)
 		clusterServerNodes = append(clusterServerNodes, node)
 	}
-	Cluster_Ch = make(chan ClusterRoutingMsg)
-	go startClusterServerRecv(conn, Cluster_Ch, dispatchCh)
+	Cluster_Ch = make(chan RoutingCommunicateMsg)
+	go startClusterServerRecv(conn, Cluster_Ch, dispatch_ch)
 	go startClusterServerCycly(conn, Cluster_Ch)
 	return 1
 }
