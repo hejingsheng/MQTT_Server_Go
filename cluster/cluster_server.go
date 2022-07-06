@@ -23,6 +23,10 @@ const (
 	CLUSTER_LOGIN_MSG = 0x0003
 )
 
+const (
+	CLUSTER_MSG_PUBLISH_DISPATCH = 100
+)
+
 type RoutingCommunicateMsg struct {
 	MsgType uint16
 	MsgFrom string
@@ -73,7 +77,7 @@ func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan R
 			log.LogPrint(log.LOG_ERROR, "public msg data error")
 		} else {
 			var dispatch_msg RoutingCommunicateMsg
-			dispatch_msg.MsgType = 100
+			dispatch_msg.MsgType = CLUSTER_MSG_PUBLISH_DISPATCH
 			dispatch_msg.MsgBody = pubData
 			dispatch_msg.MsgFrom = addr.String()
 			ch1 <- dispatch_msg
