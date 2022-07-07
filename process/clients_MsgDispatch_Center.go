@@ -19,6 +19,8 @@ const (
 	MSG_CLIENT_PUBCOMP
 
 	MSG_CLUSTER_PUBLISH = cluster.CLUSTER_MSG_PUBLISH_DISPATCH
+	MSG_CLUSTER_LOGIN = cluster.CLUSTER_MSG_LOGIN_NOTIFY
+	MSG_CLUSTER_LOGIN_INFO = cluster.CLUSTER_MSG_LOGIN_INFO_NOTIFY
 )
 
 //type DispatchRoutinMsg struct {
@@ -34,6 +36,10 @@ func processMsg(routinId string, msg cluster.RoutingCommunicateMsg) {
 		if ok {
 			log.LogPrint(log.LOG_DEBUG,"[%s] read from cycle channal one client login", routinId)
 			GloablClientsMap[mqttClient.ClientId] = mqttClient
+			var msg_cluster cluster.RoutingCommunicateMsg
+			msg_cluster.MsgType = cluster.CLUSTER_LOGIN_MSG
+			msg_cluster.MsgBody = mqttClient.ClientId
+			cluster.Cluster_Ch <- msg_cluster
 		} else {
 			log.LogPrint(log.LOG_ERROR, "[%s] add client msg data is error", routinId)
 		}
@@ -231,6 +237,34 @@ func processMsg(routinId string, msg cluster.RoutingCommunicateMsg) {
 				}
 			}
 		}
+	case MSG_CLUSTER_LOGIN:
+		loginId := msg.MsgBody.(string)
+		from := msg.MsgFrom
+		find := false
+		var clientInfo cluster.ClusterClientInfo
+		clientInfo.Subinfo = make(map[string]uint8, 1)
+		clientInfo.ClientId = loginId
+		for _, client := range GloablClientsMap {
+			if client.ClientId == loginId {
+				log.LogPrint(log.LOG_INFO, "[%s] from [%s] cluster node client [%s] login need notify", routinId, from, loginId)
+				for topic, qos := range client.SubInfo {
+					clientInfo.Subinfo[topic] = qos
+				}
+				clientInfo.OfflineMsg = append(clientInfo.OfflineMsg, client.OfflineMsg...)
+				delete(GloablClientsMap, loginId)
+				find = true
+				break;
+			}
+		}
+		if find {
+			var msg_cluster cluster.RoutingCommunicateMsg
+			msg_cluster.MsgType = cluster.CLUSTER_CLIENT_INFO_MSG
+			msg_cluster.MsgBody = clientInfo
+			msg_cluster.MsgFrom = from
+			cluster.Cluster_Ch <- msg_cluster
+		}
+	case MSG_CLUSTER_LOGIN_INFO:
+
 	default:
 		log.LogPrint(log.LOG_WARNING, "[%s] not support this msg type", routinId)
 	}

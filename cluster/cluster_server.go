@@ -21,11 +21,20 @@ const (
 	CLUSTER_HEART_MSG = 0x0001
 	CLUSTER_PUBLIC_MSG = 0x0002
 	CLUSTER_LOGIN_MSG = 0x0003
+	CLUSTER_CLIENT_INFO_MSG = 0x0004
 )
 
 const (
 	CLUSTER_MSG_PUBLISH_DISPATCH = 100
+	CLUSTER_MSG_LOGIN_NOTIFY = 101
+	CLUSTER_MSG_LOGIN_INFO_NOTIFY = 102
 )
+
+type ClusterClientInfo struct {
+	ClientId string
+	Subinfo map[string]uint8
+	OfflineMsg []protocol_stack.MQTTPacketPublishData
+}
 
 type RoutingCommunicateMsg struct {
 	MsgType uint16
@@ -51,6 +60,22 @@ func buildClusterPublishMsg(pubdata []byte) []byte {
 	binary.BigEndian.PutUint16(msg[0:2], CLUSTER_PUBLIC_MSG)
 	binary.BigEndian.PutUint16(msg[2:4], uint16(length))
 	msg = append(msg, pubdata...)
+	return msg
+}
+
+func buildClusterLoginMsg(clientId string) []byte {
+	msg := make([]byte, 4)
+	length := len(clientId)
+	binary.BigEndian.PutUint16(msg[0:2], CLUSTER_LOGIN_MSG)
+	binary.BigEndian.PutUint16(msg[2:4], uint16(length))
+	msg = append(msg, []byte(clientId)...)
+	return msg
+}
+
+func buildClusterLoginInfoMsg(info ClusterClientInfo) []byte {
+	msg := make([]byte, 4)
+	binary.BigEndian.PutUint16(msg[0:2], CLUSTER_CLIENT_INFO_MSG)
+	binary.BigEndian.PutUint16(msg[2:4], 0)
 	return msg
 }
 
@@ -82,6 +107,15 @@ func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan R
 			dispatch_msg.MsgFrom = addr.String()
 			ch1 <- dispatch_msg
 		}
+	case CLUSTER_LOGIN_MSG:
+		loginClientId := string(data[4:length])
+		var login_msg RoutingCommunicateMsg
+		login_msg.MsgType = CLUSTER_MSG_LOGIN_NOTIFY
+		login_msg.MsgBody = loginClientId
+		login_msg.MsgFrom = addr.String()
+		ch1 <- login_msg
+	case CLUSTER_CLIENT_INFO_MSG:
+
 	}
 }
 
@@ -156,6 +190,35 @@ func startClusterServerCycly(conn *net.UDPConn, ch chan RoutingCommunicateMsg) {
 							msg := buildClusterPublishMsg(jsonPub)
 							serverNode.SendMsgToNode(conn, msg)
 						}
+					}
+				}
+			case CLUSTER_LOGIN_MSG:
+				clientId := msg.MsgBody.(string)
+				for _, serverNode := range clusterServerNodes {
+					_, alive := serverNode.KeepAliveTimeEscape1Sec()
+					if alive {
+						msg := buildClusterLoginMsg(clientId)
+						serverNode.SendMsgToNode(conn, msg)
+					}
+				}
+			case CLUSTER_CLIENT_INFO_MSG:
+				clientInfo := msg.MsgBody.(ClusterClientInfo)
+				to := msg.MsgFrom
+				log.LogPrint(log.LOG_INFO, "need sync client [%s] info to cluster server node %s", clientInfo.ClientId, to)
+				index := strings.Index(to, ":")
+				ip := to[0:index]
+				port, _ := strconv.Atoi(ip[index+1 : len(ip)])
+				for _, serverNode := range clusterServerNodes {
+					if serverNode.Ip == ip && serverNode.Port == uint16(port) {
+						_, alive := serverNode.KeepAliveTimeEscape1Sec()
+						if alive {
+							log.LogPrint(log.LOG_INFO, "sync info to [%s:%d] cluster server node", serverNode.Ip, serverNode.Port)
+							msg := buildClusterLoginInfoMsg(clientInfo)
+							serverNode.SendMsgToNode(conn, msg)
+						} else {
+							log.LogPrint(log.LOG_ERROR, "sync info to [%s:%d] cluster node but it is offline")
+						}
+						break
 					}
 				}
 			}
