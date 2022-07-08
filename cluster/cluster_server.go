@@ -13,6 +13,10 @@ import (
 )
 
 const (
+	MAX_UDP_DATA_LEN = 1024
+)
+
+const (
 	TIME_1_SECOND = 10
 	TIME_1_MINUTE = 10 * 60
 )
@@ -31,9 +35,9 @@ const (
 )
 
 type ClusterClientInfo struct {
-	ClientId string
-	Subinfo map[string]uint8
-	OfflineMsg []protocol_stack.MQTTPacketPublishData
+	ClientId string                                   `json:"clientid"`
+	Subinfo map[string]uint8                          `json:"subinfo"`
+	OfflineMsg []protocol_stack.MQTTPacketPublishData `json:"offlinemsg"`
 }
 
 type RoutingCommunicateMsg struct {
@@ -72,13 +76,39 @@ func buildClusterLoginMsg(clientId string) []byte {
 	return msg
 }
 
-func buildClusterLoginInfoMsg(info ClusterClientInfo) []byte {
-	msg := make([]byte, 4)
-	binary.BigEndian.PutUint16(msg[0:2], CLUSTER_CLIENT_INFO_MSG)
-	binary.BigEndian.PutUint16(msg[2:4], 0)
-	return msg
+func buildClusterLoginInfoMsg(info []byte) [][]byte {
+	var msg_silce [][]byte
+	length := len(info)
+	index := 0
+	lastPkt := false
+	var msg []byte
+	for {
+		if index < length {
+			leng := 0
+			if length - index > MAX_UDP_DATA_LEN {
+				leng = MAX_UDP_DATA_LEN
+			} else {
+				leng = length - index
+				lastPkt = true
+			}
+			msg = make([]byte, 5)
+			binary.BigEndian.PutUint16(msg[0:2], CLUSTER_CLIENT_INFO_MSG)
+			binary.BigEndian.PutUint16(msg[2:4], uint16(leng+1))
+			if lastPkt {
+				msg[4] = 1
+			} else {
+				msg[4] = 0
+			}
+			msg = append(msg, info[index:index+leng]...)
+			index += leng;
+		} else {
+			break;
+		}
+	}
+	return msg_silce
 }
 
+var clientInfoMsg []byte
 func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan RoutingCommunicateMsg, ch1 chan RoutingCommunicateMsg) {
 	msgType := binary.BigEndian.Uint16(data[0:2])
 	msgLen := binary.BigEndian.Uint16(data[2:4])
@@ -115,7 +145,24 @@ func processClusterNodeMsg(data []byte, length int, addr *net.UDPAddr, ch chan R
 		login_msg.MsgFrom = addr.String()
 		ch1 <- login_msg
 	case CLUSTER_CLIENT_INFO_MSG:
-
+		lastPkt := data[4]
+		if lastPkt == 1 {
+			clientInfoMsg = append(clientInfoMsg, data[5:length]...)
+			var info ClusterClientInfo
+			err := json.Unmarshal(clientInfoMsg, &info)
+			if err != nil {
+				log.LogPrint(log.LOG_ERROR, "clientinfo msg data error")
+			} else {
+				var login_info_msg RoutingCommunicateMsg
+				login_info_msg.MsgType = CLUSTER_MSG_LOGIN_INFO_NOTIFY
+				login_info_msg.MsgBody = info
+				login_info_msg.MsgFrom = addr.String()
+				ch1 <- login_info_msg
+			}
+			clientInfoMsg = []byte{}
+		} else {
+			clientInfoMsg = append(clientInfoMsg, data[5:length]...)
+		}
 	}
 }
 
@@ -208,17 +255,24 @@ func startClusterServerCycly(conn *net.UDPConn, ch chan RoutingCommunicateMsg) {
 				index := strings.Index(to, ":")
 				ip := to[0:index]
 				port, _ := strconv.Atoi(ip[index+1 : len(ip)])
-				for _, serverNode := range clusterServerNodes {
-					if serverNode.Ip == ip && serverNode.Port == uint16(port) {
-						_, alive := serverNode.KeepAliveTimeEscape1Sec()
-						if alive {
-							log.LogPrint(log.LOG_INFO, "sync info to [%s:%d] cluster server node", serverNode.Ip, serverNode.Port)
-							msg := buildClusterLoginInfoMsg(clientInfo)
-							serverNode.SendMsgToNode(conn, msg)
-						} else {
-							log.LogPrint(log.LOG_ERROR, "sync info to [%s:%d] cluster node but it is offline")
+				jsonStr, err := json.Marshal(clientInfo)
+				if err != nil {
+					log.LogPrint(log.LOG_WARNING, "json error")
+				} else {
+					for _, serverNode := range clusterServerNodes {
+						if serverNode.Ip == ip && serverNode.Port == uint16(port) {
+							_, alive := serverNode.KeepAliveTimeEscape1Sec()
+							if alive {
+								log.LogPrint(log.LOG_INFO, "sync info to [%s:%d] cluster server node", serverNode.Ip, serverNode.Port)
+								msg_list := buildClusterLoginInfoMsg(jsonStr)
+								for _, msg := range msg_list {
+									serverNode.SendMsgToNode(conn, msg)
+								}
+							} else {
+								log.LogPrint(log.LOG_ERROR, "sync info to [%s:%d] cluster node but it is offline")
+							}
+							break
 						}
-						break
 					}
 				}
 			}

@@ -264,7 +264,28 @@ func processMsg(routinId string, msg cluster.RoutingCommunicateMsg) {
 			cluster.Cluster_Ch <- msg_cluster
 		}
 	case MSG_CLUSTER_LOGIN_INFO:
-
+		loginInfo := msg.MsgBody.(cluster.ClusterClientInfo)
+		from := msg.MsgFrom
+		log.LogPrint(log.LOG_INFO, "[%s] recv from cluster server node [%s] login client [%s] info", routinId, from, loginInfo.ClientId)
+		for _, client := range GloablClientsMap {
+			if client.ClientId == loginInfo.ClientId {
+				log.LogPrint(log.LOG_INFO, "[%s] from [%s] cluster node client [%s] login need notify", routinId, from, client.ClientId)
+				for _, offlineMsg := range loginInfo.OfflineMsg {
+					//var msg *protocol_stack.MQTTPacketPublishData = &offlineMsg
+					write_buf := []byte{}
+					offlineMsg.MQTTSeserialize_publish(&write_buf)
+					if offlineMsg.Qos == 2 {
+						client.PubStatus[offlineMsg.PacketId] = protocol_stack.PUBREC
+					}
+					client.conn.Write(write_buf)
+					//msg.MQTTSeserialize_publish()
+				}
+				for topic, qos := range loginInfo.Subinfo {
+					client.SubInfo[topic] = qos
+				}
+				break;
+			}
+		}
 	default:
 		log.LogPrint(log.LOG_WARNING, "[%s] not support this msg type", routinId)
 	}
